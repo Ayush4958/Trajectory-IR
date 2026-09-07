@@ -43,6 +43,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - README project links; SECURITY.md supported versions for 0.2.x (#172).
 - Pin GitHub Actions to commit digests with version comments (#167).
 - Require `Secret scan (gitleaks)` and `Workflow lint (actionlint)` on `main` (#168).
+- Go: extracted generic path-safety helpers (`CanonicalizeDir`,
+  `ResolveViaExistingAncestor`, `IsSubpath`, `RequireNonSymlinkLeaf`) out of
+  `go/trajir/mcp` into a new `go/trajir/workdir` package. `trajir-mcp`'s
+  CWE-73 root-confinement policy is unchanged and now calls the extracted
+  package; no external behavior change.
 
 ### Fixed
 

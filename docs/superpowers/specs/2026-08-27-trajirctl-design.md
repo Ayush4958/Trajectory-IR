@@ -36,17 +36,36 @@ This spec covers two things:
 
 Two small, additive changes land here before `trajirctl`'s v1 is buildable:
 
-### 2.1 Extract shared workdir-resolution helpers
+### 2.1 Extract shared path-resolution primitives
 
-`go/trajir/mcp/tools.go` has two unexported helpers used by every MCP tool:
-`requireBoundedWorkDir` (resolves + validates a workdir path stays within
-`TRAJIR_MCP_ROOT`) and `workdirSQLitePaths` (derives `nodes.sqlite` /
-`memo.sqlite` paths from a workdir). `trajirctl` needs the same logic and
-should not reimplement it.
+This section was originally written assuming `requireBoundedWorkDir` and
+`workdirSQLitePaths` were two standalone helpers in `go/trajir/mcp/tools.go`.
+Since then they moved into their own file, `go/trajir/mcp/paths.go`, which
+turns out to hold nine functions/constants, not two. Most of that file is
+not generic path-handling: it is `trajir-mcp`'s CWE-73 defense against a
+prompt-injected agent being steered outside its approved workspace —
+`EnvWorkspaceRoot`, `approvedRoot`, `requireBoundedWorkDir`, and
+`requireBoundedPath` all exist to enforce that every path stays under
+`TRAJIR_MCP_ROOT`. That threat model doesn't apply to `trajirctl`: a person
+typing `--workdir ./data` at a terminal has no untrusted intermediary
+between them and the path they typed, so forcing `trajirctl` to also
+require a `TRAJIR_MCP_ROOT`-style root just to reuse this code would import
+a policy that isn't trajirctl's to enforce.
 
-Action: move both functions into a new importable package,
-`go/trajir/workdir`. Update `go/trajir/mcp/tools.go` to call the extracted
-package instead of its own copies. No behavior change to `trajir-mcp`.
+What's actually generic is the lower layer these are built on: safe path
+resolution and symlink rejection, independent of any confinement policy —
+`canonicalizeDir`, `resolveViaExistingAncestor`, `isSubpath`, and
+`requireNonSymlinkLeaf`.
+
+Action: move only those four functions into a new importable package,
+`go/trajir/workdir`. `go/trajir/mcp/paths.go` keeps `EnvWorkspaceRoot`,
+`approvedRoot`, `requireBoundedWorkDir`, `requireBoundedPath`,
+`resolveUnderRoot`, and `workdirSQLitePaths` (the MCP-specific confinement
+policy), rewritten to call the extracted package for the primitives instead
+of defining them locally. `paths_test.go` splits the same way: symlink/
+canonicalization tests move with the extracted functions, root-confinement
+tests stay in `go/trajir/mcp`. No behavior change to `trajir-mcp` either
+way — this is a pure internal refactor.
 
 ### 2.2 Tag the Go module for subdirectory semver resolution
 
