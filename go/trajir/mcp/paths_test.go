@@ -5,6 +5,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/Coder-s-OG-s/Trajectory-IR/go/trajir/workdir"
 )
 
 func TestPathConfinementRejectsEscape(t *testing.T) {
@@ -134,7 +136,7 @@ func TestRegularSQLiteLeafAllowed(t *testing.T) {
 	if err := os.WriteFile(nodes, []byte("not-really-sqlite"), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	if err := requireNonSymlinkLeaf(root, nodes); err != nil {
+	if err := workdir.RequireNonSymlinkLeaf(root, nodes); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := requireBoundedPath("", ""); err == nil {
@@ -188,18 +190,5 @@ func TestRequireBoundedPathFailsClosedOnInvalidPreferRoot(t *testing.T) {
 	// confinement boundary back out to the full workspace root.
 	if _, err := requireBoundedPath("out.tir", filepath.Join(root, "missing-workdir")); err == nil {
 		t.Fatal("expected requireBoundedPath to fail when preferRoot cannot be resolved")
-	}
-}
-
-func TestIsSubpathExactDotDot(t *testing.T) {
-	root := t.TempDir()
-	if !isSubpath(root, filepath.Join(root, "..secrets", "a")) {
-		t.Fatal("..secrets should count as under root")
-	}
-	if isSubpath(root, filepath.Join(root, "..", "outside")) {
-		t.Fatal("parent traversal should not count as under root")
-	}
-	if !isSubpath(root, root) {
-		t.Fatal("root itself should be under root")
 	}
 }
