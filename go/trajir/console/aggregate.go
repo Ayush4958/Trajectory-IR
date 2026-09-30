@@ -36,7 +36,8 @@ type Summary struct {
 	LastPackageRedacted *bool `json:"last_package_redacted,omitempty"`
 	TransferVerifyOK   *bool  `json:"transfer_verify_ok,omitempty"`
 
-	Economy EconomyView `json:"economy"`
+	Economy   EconomyView   `json:"economy"`
+	Transfers TransfersView `json:"transfers"`
 }
 
 // Summarize builds aggregates from an ordered event list.
@@ -90,6 +91,7 @@ func Summarize(trajectoryID string, events []Event) Summary {
 		}
 	}
 	s.Economy = deriveEconomy(events, s)
+	s.Transfers = deriveTransfers(events, s)
 	return s
 }
 
