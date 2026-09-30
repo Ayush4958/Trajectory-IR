@@ -1,0 +1,70 @@
+# Console ingest (local)
+
+How to run the append-only event store for the Trajectory console.
+
+Spec: [CONSOLE_EVENTS.md](CONSOLE_EVENTS.md). Issue:
+[#393](https://github.com/Coder-s-OG-s/Trajectory-IR/issues/393).
+
+## Layout
+
+```text
+$TRAJIR_CONSOLE_DATA/
+  trajectories/
+    <trajectory_id>.ndjson
+```
+
+Each line is one `console-events-v1` event object.
+
+## Run
+
+```bash
+export TRAJIR_CONSOLE_DATA=/tmp/trajir-console
+export TRAJIR_CONSOLE_TOKEN=dev-token   # optional; empty = open local API
+cd go
+go run ./cmd/trajir-console -addr 127.0.0.1:8787
+```
+
+## HTTP
+
+| Method | Path | Notes |
+|--------|------|-------|
+| `POST` | `/v1/events` | Body = one event JSON; fail-closed on invalid envelope |
+| `GET` | `/v1/trajectories` | List trajectory ids |
+| `GET` | `/v1/trajectories/{id}/events` | Append-ordered events |
+| `GET` | `/v1/trajectories/{id}/summary` | Seal / economy / transfer rollup |
+| `GET` | `/healthz` | Liveness (no auth) |
+| `GET` | `/` | Operator UI shell (trajectory picker + panels) |
+| `GET` | `/ui/*` | Static CSS/JS for the shell |
+
+When `TRAJIR_CONSOLE_TOKEN` is set, send `Authorization: Bearer <token>` on
+all `/v1/*` routes. The UI has a token field (sessionStorage) for local demos.
+
+Open `http://127.0.0.1:8787/?id=<trajectory_id>` for a deep link.
+
+## Library
+
+Go package: `github.com/Coder-s-OG-s/Trajectory-IR/go/trajir/console`
+
+Hosts can call `Store.Append` directly (file sink) without starting HTTP.
+
+## Attach a file sink
+
+Set `TRAJIR_CONSOLE_SINK=file` and `TRAJIR_CONSOLE_DATA` to the directory above. Leave the sink env unset and nothing is emitted. A sink error is logged. The node log and the package write still succeed.
+
+```go
+sink := emit.FromEnv()
+tr, err := client.OpenTrajectory(tenant, traj, client.Options{
+    WorkDir: dir, ConsoleSink: sink,
+})
+```
+
+`emit` is `github.com/Coder-s-OG-s/Trajectory-IR/go/trajir/emit`. `client` is `go/trajir/client`.
+
+Python reference, same env vars:
+
+```python
+from trajectory_ir.console_emit import from_env
+traj = open_trajectory(tenant, traj, db_path, console_sink=from_env())
+```
+
+HTTP is `TRAJIR_CONSOLE_SINK=http`, `TRAJIR_CONSOLE_URL` (default `http://127.0.0.1:8787`), and optional `TRAJIR_CONSOLE_TOKEN`.

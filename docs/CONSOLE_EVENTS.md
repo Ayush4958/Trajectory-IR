@@ -210,6 +210,23 @@ estimated_tokens(char_len) = ceil(char_len / 4)
 If `raw_char_len` is missing, set `tokens_avoided_estimated` to `null` and show
 size-unit savings (`raw_size_units - size_units`) when those fields exist.
 
+### 3.3 Reader object (`summary.economy`)
+
+The reader copies the §3.2 headline onto `economy` so the panel does not
+estimate tokens itself.
+
+| Field | Definition |
+|-------|------------|
+| `raw_estimated_tokens`, `projected_estimated_tokens`, `tokens_avoided_estimated` | Same values as §3.2 (latest usable projection) |
+| `projection_hits` | Count of `context.projected` events |
+| `redaction_collapses` | Same sum as §3.2 |
+| `size_units_saved` | `max(0, raw_size_units - size_units)` on that latest projection, or null |
+| `lifetime_raw_estimated_tokens`, `lifetime_projected_estimated_tokens`, `lifetime_tokens_avoided_estimated` | Sum across projection events that carried the needed char lengths. Null when none did. This is not the latest headline |
+| `steps` | Projection and redaction events in append order, with per-event estimates |
+| `largest` | Projection steps ordered by raw estimated tokens, then size units |
+
+`steps` does not include thought bodies. CSV and JSON export use this object.
+
 ---
 
 ## 4. Transfer metrics
@@ -226,6 +243,16 @@ size-unit savings (`raw_size_units - size_units`) when those fields exist.
 A **handoff** in the Transfers view is an `export.completed` followed by an
 `import.completed` that shares `trajectory_id` (and optionally matching
 content hashes). The UI may draw them as one edge; the event log stays flat.
+
+### 4.1 Reader object (`summary.transfers`)
+
+| Field | Definition |
+|-------|------------|
+| `exports_ok`, `imports_ok` | Same counts as the summary rollup |
+| `handoffs[].status` | `connected` when an import attaches and `verify_ok` is true. `failed` when export `ok` is false or import `verify_ok` is false. `export_only` / `import_only` when the other side is missing |
+| pairing | Same `path` wins. Otherwise the oldest open export in that trajectory is used. Events are already scoped to one trajectory id |
+
+The panel copies `error` and `redacted` from those events. It does not read thought bodies.
 
 ---
 
@@ -279,3 +306,4 @@ If a panel needs a number that is not in §3–§4, extend **this document** fir
 - Seals: Go `trajir/client.SealDecision` (DECISION node)
 - Epic: [#391](https://github.com/Coder-s-OG-s/Trajectory-IR/issues/391)
 - Spec issue: [#392](https://github.com/Coder-s-OG-s/Trajectory-IR/issues/392)
+- Ingest: [CONSOLE_INGEST.md](CONSOLE_INGEST.md) / [#393](https://github.com/Coder-s-OG-s/Trajectory-IR/issues/393)
