@@ -139,16 +139,20 @@ jobs:
           python -m venv .venv-smoke
           .venv-smoke/bin/pip install --upgrade pip
           .venv-smoke/bin/pip install dist/trajectory_ir-*.whl
-          .venv-smoke/bin/python -c "\
+          SMOKE_PY="$PWD/.venv-smoke/bin/python"
+          SMOKE_DIR=$(mktemp -d)
+          cd "$SMOKE_DIR"
+          "$SMOKE_PY" -c "\
           import trajectory_ir; \
           from trajectory_ir.runtime.nodes import Node, payload_hash; \
           from trajectory_ir.runtime.log import NodeLog; \
           from trajectory_ir.storage import FileSystemCAS, content_hash; \
           from trajectory_ir.client.python.trajectory_client import open_trajectory; \
+          from trajectory_ir.drivers.s3.cas import S3CAS; \
           import importlib.util; \
-          import trajectory_ir.drivers.sqlite; \
           assert content_hash(b'') == 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855'; \
           assert open_trajectory; \
+          assert S3CAS; \
           assert importlib.util.find_spec('client') is None; \
           assert importlib.util.find_spec('drivers') is None; \
           log = NodeLog(':memory:'); \

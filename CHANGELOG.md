@@ -29,9 +29,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- Python `client` and `drivers` are packages under `trajectory_ir`
-  (`trajectory_ir.client`, `trajectory_ir.drivers`). The wheel no longer
-  installs top-level modules with those names (#459).
+- Python `client` and `drivers` are packages under `trajectory_ir`.
+  The wheel no longer installs top-level modules with those names (#459).
+  Hosts need to update imports:
+
+  `from client.python.trajectory_client import open_trajectory`
+  -> `from trajectory_ir.client.python.trajectory_client import open_trajectory`
+
+  `from drivers.durable_backend.dbos.adapter import init_backend`
+  -> `from trajectory_ir.drivers.durable_backend.dbos.adapter import init_backend`
+
+  `from drivers.postgres.log import open_postgres_node_log`
+  -> `from trajectory_ir.drivers.postgres.log import open_postgres_node_log`
+
+  `from drivers.s3.cas import S3CAS`
+  -> `from trajectory_ir.drivers.s3.cas import S3CAS`
 - **Docs honesty:** landing README, scope card, master spec §7.2/§7.3/§8.3/§8.4
   now state the actual invariants. Honest resume freezes the plan, not the
   world. Block-and-gate is at-most-one automatic attempt, not "the world still
