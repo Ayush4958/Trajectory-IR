@@ -44,7 +44,7 @@ object exists for the tag (the action creates/updates it) and that
 
 | Surface | Where | Notes |
 |---------|--------|--------|
-| Python package | `pyproject.toml` → `project.version` | Current line: `0.2.1` (Phase 1C patch) |
+| Python package | `pyproject.toml` → `project.version` | Current line: `0.2.3` (one-step Claude attach) |
 | Git tag | `v0.2.0` Phase 1B; **`v0.2.1`** Phase 1C harden | Prefer `v` prefix |
 | Go module | `go/go.mod` | No separate semver tag yet; consumers use commit or a later policy |
 
