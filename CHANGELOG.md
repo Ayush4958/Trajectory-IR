@@ -9,6 +9,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- `scripts/install_claude.ps1` and `scripts/install_claude.sh` take a target
+  directory. Hooks and MCP config land in that project. The hook command is
+  `integrations/attach/launch_hook.py` with `TRAJIR_IDENTITY_FILE`. The user
+  profile is not edited. The same step writes Cursor, VS Code, Gemini CLI,
+  and Codex project config, plus `.trajir` snippets for LangGraph and ADK.
+  Those MCP entries do not seal the host's own tools. The snippets do not
+  import those libraries until a function is called.
+- Claude PreToolUse still exits 0 on the first seal. A repeat of the same
+  `tool_use_id` for `NON_IDEMPOTENT_WRITE` exits 2. The hook does not call
+  the tool and does not start DBOS. PostToolUse still exits 0 when the diary
+  write fails.
+- The installer starts `trajir-console` on `127.0.0.1:8787` when that port
+  is free. It does not replace a process that is already listening.
+  `--skip-console` skips the start.
+- `.github/workflows/docs-site.yml` builds the MkDocs site. The deploy job
+  runs on pushes to main. Turning on GitHub Pages for the live site is a
+  repository setting after that workflow is on main.
 - Seal-derived idempotency keys on every `TOOL_CALL`. Format is
   `hex(sha256(length-prefixed utf-8 fields))` with domain
   `trajir-idempotency-v1`: each field is `uint32be(byte length) || utf-8`,

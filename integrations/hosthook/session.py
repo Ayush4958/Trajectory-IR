@@ -203,7 +203,10 @@ def seal_before_tool(
         state = _load_state(root)
         existing = state["pending"].get(tool_use_id) or state["done"].get(tool_use_id)
         if existing:
-            return dict(existing)
+            # replay is a return-only flag. It is not written into hook_state.json.
+            found = dict(existing)
+            found["replay"] = True
+            return found
         step_n = int(state["next_step"])
         decision_id = ""
         content_hash = ""

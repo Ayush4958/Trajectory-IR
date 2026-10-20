@@ -61,6 +61,9 @@ def test_seal_then_record_keeps_decision_first(tmp_path: Path) -> None:
         annotations=_READ_ONLY,
     )
     assert again["step_n"] == 1
+    assert again["replay"] is True
+    saved = json.loads((tmp_path / "hook_state.json").read_text(encoding="utf-8"))
+    assert "replay" not in saved["pending"]["use-1"]
 
     recorded = record_tool_result(tmp_path, "demo", "hook-1", "use-1", "hello")
     assert recorded["recorded"] is True

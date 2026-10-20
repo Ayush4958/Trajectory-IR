@@ -108,6 +108,32 @@ More: **[QUICKSTART.md](QUICKSTART.md)** · kill-mid-deploy demo: [`examples/kil
 
 ---
 
+## Attach it to a project
+
+One command in this checkout builds `trajir.exe`, `trajir-mcp.exe`, and `trajir-console.exe`. It writes project-local hooks and smoke-checks one pack. The user profile is not edited.
+
+```powershell
+pwsh -File scripts\install_claude.ps1
+pwsh -File scripts\install_claude.ps1 -Target C:\path\to\other\repo
+```
+
+```bash
+./scripts/install_claude.sh
+./scripts/install_claude.sh --target /path/to/other/repo
+```
+
+`--target` writes the config into that directory. The hook scripts stay in this install. The same step writes Cursor, VS Code, Gemini CLI, and Codex project MCP config. Those entries do not seal the host's own tools. LangGraph and ADK snippets land in `.trajir/` and import their libraries only when called.
+
+The first PreToolUse exits 0 after the seal so the host can run the tool. A second PreToolUse for the same `NON_IDEMPOTENT_WRITE` `tool_use_id` exits 2. The hook does not call the tool and does not start DBOS. If the diary write fails after the tool has already run, PostToolUse still exits 0.
+
+If `127.0.0.1:8787` is free, the installer starts `trajir-console` there. If something is already listening, it leaves that process alone. `--skip-console` skips the start. There is no second console.
+
+Token numbers on the console are `ceil(chars/4)` estimates. Adopters stay empty. This is not exactly-once, not a process sandbox, and not Sigstore.
+
+The install page is [website/docs/one-step.md](website/docs/one-step.md). GitHub Actions builds it from `.github/workflows/docs-site.yml` after that file is on main.
+
+---
+
 ## Who is this for?
 
 | Audience | Start here |

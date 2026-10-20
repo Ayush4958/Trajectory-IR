@@ -1,7 +1,8 @@
 """Claude Code PreToolUse hook. Seals the decision, then exits.
 
-Exit 0 lets the host run the tool. Exit 2 blocks the tool because the seal
-did not land. The tool body is not called from this process.
+Exit 0 lets the host run the tool the first time. Exit 2 blocks when the
+seal did not land, or when this tool_use_id was already sealed as
+NON_IDEMPOTENT_WRITE. The tool body is not called from this process.
 """
 
 from __future__ import annotations
@@ -19,6 +20,29 @@ if str(_ROOT / "pkg") not in sys.path:
 from integrations.claude.config import hook_identity, tool_use_id  # noqa: E402
 from integrations.hosthook.session import seal_before_tool  # noqa: E402
 
+from trajectory_ir.effects.classify import EffectClass, requires_block_and_gate  # noqa: E402
+
+
+def _annotations(event: dict) -> dict | None:
+    raw = event.get("annotations")
+    if isinstance(raw, dict):
+        return raw
+    raw = event.get("tool_annotations")
+    if isinstance(raw, dict):
+        return raw
+    return None
+
+
+def _replay_blocked(record: dict) -> bool:
+    """Same slot as LangGraph block-and-gate: only a sealed non-idempotent write."""
+    if not record.get("replay"):
+        return False
+    try:
+        effect = EffectClass(str(record.get("effect_class") or ""))
+    except ValueError:
+        return True
+    return requires_block_and_gate(effect)
+
 
 def main() -> int:
     raw = sys.stdin.read()
@@ -35,16 +59,23 @@ def main() -> int:
     args = tool_input if isinstance(tool_input, dict) else {"value": tool_input}
     try:
         ident = hook_identity()
-        seal_before_tool(
+        record = seal_before_tool(
             ident["work_dir"],
             ident["tenant_id"],
             ident["trajectory_id"],
             name,
             args,
             tool_use_id(event),
+            annotations=_annotations(event),
         )
     except Exception as exc:
         print(f"trajir pre-tool seal failed: {exc}", file=sys.stderr)
+        return 2
+    if _replay_blocked(record):
+        print(
+            "trajir pre-tool: already sealed, not running this tool again",
+            file=sys.stderr,
+        )
         return 2
     return 0
 

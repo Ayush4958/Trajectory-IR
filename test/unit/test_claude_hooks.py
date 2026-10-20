@@ -82,6 +82,81 @@ def test_failure_hook_records_abort_and_ignores_bad_json(monkeypatch, tmp_path: 
     assert "fail-1" not in state["pending"]
 
 
+def test_second_gated_pre_tool_exits_2(monkeypatch, tmp_path: Path) -> None:
+    monkeypatch.setenv("TRAJIR_WORK_DIR", str(tmp_path))
+    monkeypatch.setenv("TRAJIR_TENANT_ID", "demo")
+    monkeypatch.setenv("TRAJIR_TRAJECTORY_ID", "stdin-gate")
+    event = {
+        "tool_name": "Bash",
+        "tool_use_id": "bash-replay",
+        "tool_input": {"command": "echo hi"},
+    }
+    monkeypatch.setattr("sys.stdin", StringIO(json.dumps(event)))
+    assert pre_main() == 0
+    monkeypatch.setattr("sys.stdin", StringIO(json.dumps(event)))
+    assert pre_main() == 2
+    state = json.loads((tmp_path / "hook_state.json").read_text(encoding="utf-8"))
+    assert state["next_step"] == 2
+    assert "replay" not in state["pending"]["bash-replay"]
+    log = NodeLog(str(tmp_path / "nodes.sqlite"))
+    try:
+        rows = log.list_nodes("stdin-gate", tenant_id="demo")
+    finally:
+        log.close()
+    assert [row["kind"] for row in rows].count("DECISION") == 1
+
+
+def test_read_only_replay_still_exits_0(monkeypatch, tmp_path: Path) -> None:
+    monkeypatch.setenv("TRAJIR_WORK_DIR", str(tmp_path))
+    monkeypatch.setenv("TRAJIR_TENANT_ID", "demo")
+    monkeypatch.setenv("TRAJIR_TRAJECTORY_ID", "stdin-ro")
+    event = {
+        "tool_name": "lookup",
+        "tool_use_id": "ro-1",
+        "tool_input": {"q": "x"},
+        "annotations": {"readOnlyHint": True, "destructiveHint": False},
+    }
+    monkeypatch.setattr("sys.stdin", StringIO(json.dumps(event)))
+    assert pre_main() == 0
+    monkeypatch.setattr("sys.stdin", StringIO(json.dumps(event)))
+    assert pre_main() == 0
+    state = json.loads((tmp_path / "hook_state.json").read_text(encoding="utf-8"))
+    assert state["pending"]["ro-1"]["effect_class"] == "READ_ONLY"
+    assert "replay" not in state["pending"]["ro-1"]
+
+
+def test_identity_file_picks_the_work_dir(monkeypatch, tmp_path: Path) -> None:
+    monkeypatch.delenv("TRAJIR_WORK_DIR", raising=False)
+    monkeypatch.delenv("TRAJIR_TENANT_ID", raising=False)
+    monkeypatch.delenv("TRAJIR_TRAJECTORY_ID", raising=False)
+    work = tmp_path / "from-file"
+    ident = tmp_path / "id.json"
+    ident.write_text(
+        json.dumps(
+            {
+                "work_dir": str(work),
+                "tenant_id": "file-tenant",
+                "trajectory_id": "file-traj",
+            }
+        ),
+        encoding="utf-8",
+    )
+    monkeypatch.setenv("TRAJIR_IDENTITY_FILE", str(ident))
+    event = {"tool_name": "echo", "tool_use_id": "id-1", "tool_input": {"msg": "hi"}}
+    monkeypatch.setattr("sys.stdin", StringIO(json.dumps(event)))
+    assert pre_main() == 0
+    assert (work / "nodes.sqlite").is_file()
+
+
+def test_missing_identity_file_exits_2(monkeypatch, tmp_path: Path) -> None:
+    monkeypatch.delenv("TRAJIR_WORK_DIR", raising=False)
+    monkeypatch.setenv("TRAJIR_IDENTITY_FILE", str(tmp_path / "missing.json"))
+    event = {"tool_name": "echo", "tool_use_id": "miss-file", "tool_input": {"msg": "hi"}}
+    monkeypatch.setattr("sys.stdin", StringIO(json.dumps(event)))
+    assert pre_main() == 2
+    assert not (tmp_path / "nodes.sqlite").exists()
+
+
 def test_post_tool_record_failure_still_exits_zero(monkeypatch, tmp_path: Path) -> None:
     """The tool already ran. A diary write failure must not ask the host to run it again."""
     monkeypatch.setenv("TRAJIR_WORK_DIR", str(tmp_path))
