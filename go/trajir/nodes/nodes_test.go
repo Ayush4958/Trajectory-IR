@@ -122,6 +122,7 @@ func TestValidateIDComponentRejectsInvalidValues(t *testing.T) {
 		{"pipe delimiter", "a|b"},
 		{"control char", "a\x00b"},
 		{"too long", strings.Repeat("x", 513)},
+		{"too long multibyte", strings.Repeat("中", 513)},
 	}
 	for _, c := range cases {
 		c := c
@@ -136,6 +137,15 @@ func TestValidateIDComponentRejectsInvalidValues(t *testing.T) {
 func TestValidateIDComponentAccepts(t *testing.T) {
 	if err := nodes.ValidateIDComponent("field", "ok-value"); err != nil {
 		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestValidateIDComponentCountsCharactersNotBytes(t *testing.T) {
+	// Python len() counts code points, so 512 multibyte characters must pass here too.
+	for _, value := range []string{strings.Repeat("中", 512), strings.Repeat("😀", 512)} {
+		if err := nodes.ValidateIDComponent("tenant_id", value); err != nil {
+			t.Fatalf("len=%d bytes: %v", len(value), err)
+		}
 	}
 }
 
@@ -155,6 +165,12 @@ func TestNodeIDRejectsInvalidComponents(t *testing.T) {
 	}
 	if _, err := nodes.NodeID("demo", "t1", nil, 0, "TOOL|CALL", "h"); err == nil {
 		t.Fatal("expected error for pipe in kind")
+	}
+	if _, err := nodes.NodeID("demo", "t1", nil, 0, "INPUT", "a|b"); err == nil {
+		t.Fatal("expected error for pipe in payload_hash")
+	}
+	if _, err := nodes.NodeID("demo", "t1", nil, 0, "INPUT", ""); err == nil {
+		t.Fatal("expected error for empty payload_hash")
 	}
 }
 

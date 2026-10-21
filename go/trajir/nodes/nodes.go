@@ -51,7 +51,7 @@ func ValidateIDComponent(name, value string) error {
 	if strings.ContainsAny(value, "|\n\r\x00") {
 		return fmt.Errorf("%s must not contain '|' or control characters (identity delimiter safety)", name)
 	}
-	if len(value) > 512 {
+	if utf8.RuneCountInString(value) > 512 {
 		return fmt.Errorf("%s exceeds maximum length 512", name)
 	}
 	return nil
@@ -89,6 +89,9 @@ func NodeID(tenantID, trajectoryID string, stepN *int, seq int, kind, phash stri
 		return "", err
 	}
 	if err := ValidateIDComponent("kind", kind); err != nil {
+		return "", err
+	}
+	if err := ValidateIDComponent("payload_hash", phash); err != nil {
 		return "", err
 	}
 	step := "None"
