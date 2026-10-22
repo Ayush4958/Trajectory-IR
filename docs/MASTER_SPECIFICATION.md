@@ -615,16 +615,16 @@ trajectory-ir/
                                   # no lease/heartbeat implementation; calls the backend adapter
     effects/                     # effect class registry, MCP mapping
     package/                     # .tir export/import (fat/thin/redacted)
-  client/
-    python/
-  drivers/
-    durable-backend/
-      dbos/                      # Phase 1A default adapter
-      restate/                   # optional second adapter, later
-    sqlite/
-    postgres/
-    s3/
-    fluid/                       # only relevant when k8s-fluid profile is used
+    client/
+      python/
+    drivers/
+      durable-backend/
+        dbos/                    # Phase 1A default adapter
+        restate/                 # optional second adapter, later
+      sqlite/
+      postgres/
+      s3/
+      fluid/                     # only relevant when k8s-fluid profile is used
   conformance/
     r01_seal_resume_test.py
     r02_non_idempotent_test.py
@@ -664,7 +664,7 @@ This section exists specifically so that multiple AI coding agents (including di
 ### 15.1 Specialized Agent Roles (ECC Suite)
 When developing Trajectory IR using AI coding assistants, human maintainers and agents must operate under three mandatory procedural gate roles:
 - **Planner Agent**: Must be invoked for any major architectural change, module creation, or ambiguous task to research and draft an `implementation_plan.md` before coding begins.
-- **TDD-Guide Agent**: Enforces test-driven development for all logic in `pkg/` and `drivers/`. Modules must be built test-first with over 80% test coverage.
+- **TDD-Guide Agent**: Enforces test-driven development for all logic in `pkg/` and `pkg/trajectory_ir/drivers/`. Modules must be built test-first with over 80% test coverage.
 - **Security-Review Agent**: A mandatory procedural peer-review gate that must analyze and sign off on any proposed modifications to `pkg/effects/` (tool safety boundaries) or `pkg/resume/` (block-and-gate semantics) before a human maintainer merges the changes.
 
 ### 15.2 Hard Implementation Rules
@@ -678,7 +678,7 @@ Treat every numbered rule below as an immutable constraint, not a suggestion:
 6. **Effect classification defaults to fail closed (§7.2).** Never write code that defaults an unclassified or ambiguous tool to anything other than `NON_IDEMPOTENT_WRITE`. Use `ClassifyTool` / `classify_tool` for named tools so open-world primitives cannot be tagged `READ_ONLY` by MCP hint alone. `ExecTool` / `RunStep` must still refuse an open-world `Tool` tagged `PURE` / `READ_ONLY` / `IDEMPOTENT_WRITE` unless `AllowOpenWorldOverride` is set. Do not implement a command AST.
 7. **Never make correctness depend on a cache.** Any code path touching Fluid, or any other caching layer, must have a working fallback to the durable source of truth with hash verification, per §11.3. Code review (automated or human) should treat a cache dependent correctness path as a blocking defect.
 8. **Stay inside declared scope (§5).** Do not implement anything listed under "out of scope for this phase," even if it seems like a natural extension, without an approved issue first. This includes Kubernetes provisioning, plan DAGs, a second backend adapter, and Fluid integration outside of the `k8s-fluid` profile.
-9. **One module, one clear owner in the code, even without a manually assigned task.** Before modifying a directory under `pkg/`, `drivers/`, or `conformance/`, check whether existing code in that directory implies an established pattern (naming, error handling, data structures) and follow it exactly rather than introducing a second convention. If two implementations of the same responsibility already exist, that is a defect to be reported, not a choice to pick one arbitrarily.
+9. **One module, one clear owner in the code, even without a manually assigned task.** Before modifying a directory under `pkg/`, `pkg/trajectory_ir/drivers/`, or `conformance/`, check whether existing code in that directory implies an established pattern (naming, error handling, data structures) and follow it exactly rather than introducing a second convention. If two implementations of the same responsibility already exist, that is a defect to be reported, not a choice to pick one arbitrarily.
 10. **No feature merges without its conformance test.** If an agent implements behavior covered by R01–R11, it must also implement or update the corresponding test, and that test must pass before the change is considered complete.
 11. **When in doubt, prefer doing less over doing something not specified here.** An incomplete implementation that matches this document exactly is preferable to a complete one that deviates from it.
 

@@ -29,9 +29,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- Python `client` and `drivers` are packages under `trajectory_ir`.
-  The wheel no longer installs top-level modules with those names (#459).
-  Hosts need to update imports:
+- **BREAKING:** Python `client` and `drivers` are packages under
+  `trajectory_ir` (0.3.0). The wheel no longer installs top-level modules
+  with those names (#459). Hosts need to update imports:
 
   `from client.python.trajectory_client import open_trajectory`
   -> `from trajectory_ir.client.python.trajectory_client import open_trajectory`
