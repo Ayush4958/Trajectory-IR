@@ -16,10 +16,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   and Codex project config, plus `.trajir` snippets for LangGraph and ADK.
   Those MCP entries do not seal the host's own tools. The snippets do not
   import those libraries until a function is called.
-- Claude PreToolUse still exits 0 on the first seal. A repeat of the same
-  `tool_use_id` for `NON_IDEMPOTENT_WRITE` exits 2. The hook does not call
-  the tool and does not start DBOS. PostToolUse still exits 0 when the diary
-  write fails.
+- Claude PreToolUse still exits 0 on the first seal, and on a second
+  PreToolUse for the same id while that call is still pending. A later
+  PreToolUse after the result is recorded exits 2 for
+  `NON_IDEMPOTENT_WRITE` and for a recorded row with no effect class.
+  The hook does not call the tool and does not start DBOS. PostToolUse
+  still exits 0 when the diary write fails. The tool-call row is stored
+  only after the tool has run.
+- The installer resolves `--target` before it changes directory, reads an
+  identity file only from `TRAJIR_IDENTITY_FILE`, and adds
+  `.local-evidence/` to the target `.gitignore`. MCP command paths in the
+  project config are absolute on that machine.
 - The installer starts `trajir-console` on `127.0.0.1:8787` when that port
   is free. It does not replace a process that is already listening.
   `--skip-console` skips the start.

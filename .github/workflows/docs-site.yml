@@ -1,3 +1,9 @@
+# Actions runs this file.
+# website/docs-site.workflow.yml is the same text, kept in the website tree
+# so a token without the workflow scope can still review it. Keep the two
+# copies the same. A pull request uses its own concurrency group, so it
+# cannot cancel a Pages deploy from main.
+
 name: Docs site
 
 on:
@@ -12,8 +18,11 @@ on:
       - ".github/workflows/docs-site.yml"
   workflow_dispatch:
 
+permissions:
+  contents: read
+
 concurrency:
-  group: pages
+  group: pages-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
@@ -31,7 +40,7 @@ jobs:
           python-version: "3.12"
 
       - name: Install MkDocs
-        run: pip install -r website/requirements.txt
+        run: python -m pip install --require-hashes -r website/requirements.lock
 
       - name: Build site
         working-directory: website

@@ -4,8 +4,9 @@
 # Starts trajir-console on 127.0.0.1:8787 only when that port is free.
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-cd "$ROOT"
 
+# Resolve --target before cd. After the cd, --target . is this checkout,
+# and a relative path would be stored in the hook config as text.
 TARGET=""
 SKIP_CONSOLE=0
 EXTRA=()
@@ -16,8 +17,12 @@ while [[ $# -gt 0 ]]; do
         echo "missing directory after --target" >&2
         exit 1
       fi
-      TARGET="$2"
-      EXTRA+=(--target "$2")
+      if [[ ! -d "$2" ]]; then
+        echo "target directory not found: $2" >&2
+        exit 1
+      fi
+      TARGET="$(cd "$2" && pwd)"
+      EXTRA+=(--target "$TARGET")
       shift 2
       ;;
     --skip-console)
@@ -31,6 +36,8 @@ while [[ $# -gt 0 ]]; do
       ;;
   esac
 done
+
+cd "$ROOT"
 
 echo "== One-step Claude attach =="
 echo "  root: $ROOT"
@@ -71,6 +78,8 @@ echo "  Verify a pack with: ./go/trajir.exe verify <pack.tir>"
 if [[ "$SKIP_CONSOLE" -eq 1 ]]; then
   echo "Console start skipped."
 fi
+echo ".local-evidence/ is listed in the target .gitignore."
+echo "MCP command paths are absolute on this machine."
 echo "The user profile was not changed."
 echo "Console is 127.0.0.1:8787 only. A listener already on that port is left alone."
 echo "INSTALL OK"

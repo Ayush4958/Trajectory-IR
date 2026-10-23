@@ -201,11 +201,21 @@ def seal_before_tool(
     effect = classify_tool(tool_name, annotations)
     with _Lock(root):
         state = _load_state(root)
-        existing = state["pending"].get(tool_use_id) or state["done"].get(tool_use_id)
-        if existing:
+        done = state["done"].get(tool_use_id)
+        if done:
             # replay is a return-only flag. It is not written into hook_state.json.
-            found = dict(existing)
+            # It means this tool_use_id already finished (result or failure).
+            found = dict(done)
             found["replay"] = True
+            return found
+        pending = state["pending"].get(tool_use_id)
+        if pending:
+            # A second PreToolUse while the call is still pending is another
+            # observer of the same host call. Claude runs every matching hook
+            # before the tool body. That must not look like a finished replay,
+            # or a project hook plus a user hook exits 2 and the tool never runs.
+            found = dict(pending)
+            found["duplicate"] = True
             return found
         step_n = int(state["next_step"])
         decision_id = ""

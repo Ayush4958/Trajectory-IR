@@ -7,7 +7,6 @@ import os
 from pathlib import Path
 
 _ROOT = Path(__file__).resolve().parents[2]
-_CONFIG = _ROOT / ".local-evidence" / "claude-one-step.json"
 
 
 def _file_cfg(path: Path) -> dict[str, str]:
@@ -18,19 +17,19 @@ def _file_cfg(path: Path) -> dict[str, str]:
 
 
 def _identity_file() -> Path | None:
-    """TRAJIR_IDENTITY_FILE wins. Then the cwd file. Then this checkout."""
+    """Read an identity file only when TRAJIR_IDENTITY_FILE is set.
+
+    A ``.local-evidence/claude-one-step.json`` in the current directory is
+    ignored. Any repo could plant that file and redirect ``work_dir``. A bad
+    JSON file is fatal only when the installer pointed the env var at it.
+    """
     env_file = os.environ.get("TRAJIR_IDENTITY_FILE")
-    if env_file:
-        path = Path(env_file)
-        if not path.is_file():
-            raise FileNotFoundError(f"TRAJIR_IDENTITY_FILE not found: {path}")
-        return path
-    cwd_file = Path.cwd() / ".local-evidence" / "claude-one-step.json"
-    if cwd_file.is_file():
-        return cwd_file
-    if _CONFIG.is_file():
-        return _CONFIG
-    return None
+    if not env_file:
+        return None
+    path = Path(env_file)
+    if not path.is_file():
+        raise FileNotFoundError(f"TRAJIR_IDENTITY_FILE not found: {path}")
+    return path
 
 
 def hook_identity() -> dict[str, str]:

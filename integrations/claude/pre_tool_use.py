@@ -1,8 +1,10 @@
 """Claude Code PreToolUse hook. Seals the decision, then exits.
 
-Exit 0 lets the host run the tool the first time. Exit 2 blocks when the
-seal did not land, or when this tool_use_id was already sealed as
-NON_IDEMPOTENT_WRITE. The tool body is not called from this process.
+Exit 0 lets the host run the tool the first time. A second hook for the
+same still-pending tool_use_id also exits 0, so two registrations do not
+block the first run. Exit 2 blocks when the seal did not land, or when
+this tool_use_id was already recorded and the effect is gated or unknown.
+The tool body is not called from this process.
 """
 
 from __future__ import annotations

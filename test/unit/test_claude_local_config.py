@@ -94,6 +94,9 @@ def test_target_dir_keeps_hooks_in_the_install(tmp_path: Path) -> None:
         (target / ".local-evidence" / "claude-one-step.json").read_text(encoding="utf-8")
     )
     assert ident["work_dir"].startswith(str(target))
+    assert Path(ident["work_dir"]).is_absolute()
+    ignore = (target / ".gitignore").read_text(encoding="utf-8")
+    assert ".local-evidence/" in ignore.splitlines()
     mcp = json.loads((target / ".mcp.json").read_text(encoding="utf-8"))
     assert mcp["mcpServers"]["trajectory-ir"]["env"]["TRAJIR_MCP_ROOT"] == str(target)
     assert mcp["mcpServers"]["trajectory-ir"]["command"] == str(mcp_bin)
@@ -140,6 +143,32 @@ def test_invalid_cursor_json_writes_nothing(tmp_path: Path) -> None:
     assert settings.read_text(encoding="utf-8") == "{}\n"
     assert cursor.read_text(encoding="utf-8") == "["
     assert not (tmp_path / ".mcp.json").exists()
+
+
+def test_relative_target_is_stored_absolute(monkeypatch, tmp_path: Path) -> None:
+    module = _load()
+    project = tmp_path / "project"
+    project.mkdir()
+    monkeypatch.chdir(tmp_path)
+    assert module.main(["--skip-console", "--target", "project"]) == 0
+    ident = json.loads(
+        (project / ".local-evidence" / "claude-one-step.json").read_text(encoding="utf-8")
+    )
+    assert Path(ident["work_dir"]).is_absolute()
+    assert Path(ident["work_dir"]).is_relative_to(project.resolve())
+    mcp = json.loads((project / ".mcp.json").read_text(encoding="utf-8"))
+    command = mcp["mcpServers"]["trajectory-ir"]["command"]
+    assert Path(command).is_absolute()
+
+
+def test_install_scripts_resolve_target_before_changing_directory() -> None:
+    root = Path(__file__).resolve().parents[2]
+    shell = (root / "scripts" / "install_claude.sh").read_text(encoding="utf-8")
+    assert shell.index('TARGET="$(cd "$2" && pwd)"') < shell.index('cd "$ROOT"')
+    powershell = (root / "scripts" / "install_claude.ps1").read_text(encoding="utf-8")
+    assert powershell.index("Resolve-Path -LiteralPath $Target") < powershell.index(
+        "Set-Location $root"
+    )
 
 
 def test_skip_console_does_not_start(monkeypatch, tmp_path: Path) -> None:

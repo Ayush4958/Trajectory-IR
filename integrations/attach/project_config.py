@@ -191,6 +191,24 @@ def _adk_snippet(install: Path, dest: Path) -> str:
     )
 
 
+def _ignore_local_evidence(dest: Path) -> None:
+    """Keep tool args and results out of git. Leave an existing rule alone."""
+    dest.mkdir(parents=True, exist_ok=True)
+    path = dest / ".gitignore"
+    needle = ".local-evidence/"
+    try:
+        current = path.read_text(encoding="utf-8") if path.is_file() else ""
+    except OSError as exc:
+        print(f"trajir attach: left .gitignore unread ({exc})", file=sys.stderr)
+        return
+    if any(line.strip() in {needle, ".local-evidence"} for line in current.splitlines()):
+        return
+    prefix = ""
+    if current and not current.endswith("\n"):
+        prefix = "\n"
+    path.write_text(current + f"{prefix}{needle}\n", encoding="utf-8")
+
+
 def write_local_config(
     root: Path,
     py: str,
@@ -201,9 +219,11 @@ def write_local_config(
 
     ``root`` is the Trajectory IR install. ``target`` is the project that
     receives the JSON. When target is omitted, both are the same directory.
+    Both paths are resolved so a relative target is not stored as text.
     """
-    install = Path(root)
-    dest = Path(target) if target is not None else install
+    install = Path(root).resolve()
+    dest = Path(target).resolve() if target is not None else install
+    mcp_bin = Path(mcp_bin).resolve()
     paths = {name: dest / rel for name, rel in _JSON_RELATIVE.items()}
     try:
         loaded = {name: _read_object(path) for name, path in paths.items()}
@@ -211,6 +231,7 @@ def write_local_config(
         print(f"trajir claude config: {exc}", file=sys.stderr)
         return 1
 
+    _ignore_local_evidence(dest)
     work = dest / ".local-evidence" / "claude-agent"
     work.mkdir(parents=True, exist_ok=True)
     identity = {

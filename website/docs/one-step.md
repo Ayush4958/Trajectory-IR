@@ -9,14 +9,19 @@ pwsh -File scripts\install_claude.ps1 -Target C:\path\to\your\project
 
 ```bash
 ./scripts/install_claude.sh --target /path/to/your/project
-./go/trajir.exe verify pack.tir
+```
+
+The installer smoke-checks its own pack. Verify a pack you exported:
+
+```bash
+./go/trajir.exe verify path/to/pack.tir
 ```
 
 `--target` writes the config into that project. The hook scripts stay in this install. The user profile is not edited. The same command writes Cursor, VS Code, Gemini CLI, and Codex project MCP config. Those MCP tools are `trajectory_status`, `trajectory_export_tir`, `trajectory_import_tir`, and `trajectory_verify_signature`. They do not seal the host's own tools.
 
 If nothing is listening on `127.0.0.1:8787`, the installer starts `trajir-console` there. If the port is taken, it leaves that process alone. Pass `--skip-console` to skip the start. There is no second console.
 
-The first PreToolUse seals the decision and exits 0 so the host can run the tool. A second PreToolUse for the same `tool_use_id`, when that seal is `NON_IDEMPOTENT_WRITE`, exits 2. The hook does not call the tool and does not start DBOS. PostToolUse records the result. If that diary write fails, PostToolUse still exits 0 so the host is not asked to run the tool again. PostToolUseFailure records a failed tool and clears its pending row.
+The first PreToolUse seals the decision and exits 0 so the host can run the tool. Another PreToolUse for that same id, while the call is still pending, also exits 0. After the result is recorded, a later PreToolUse for that `NON_IDEMPOTENT_WRITE` id exits 2. The hook does not call the tool and does not start DBOS. PostToolUse records the result. That write is best-effort and happens after the tool has run. If it fails, PostToolUse still exits 0 so the host is not asked to run the tool again. PostToolUseFailure records a failed tool and clears its pending row.
 
 LangGraph still gates inside the tool wrap. The first body runs. A later resume does not run that gated body again.
 

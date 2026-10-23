@@ -8,6 +8,13 @@ param(
 )
 $ErrorActionPreference = "Stop"
 $root = Split-Path -Parent $PSScriptRoot
+# Resolve -Target before Set-Location. After the cd, -Target . is this checkout.
+if ($Target) {
+    if (-not (Test-Path -LiteralPath $Target -PathType Container)) {
+        throw "target directory not found: $Target"
+    }
+    $Target = (Resolve-Path -LiteralPath $Target).Path
+}
 Set-Location $root
 
 Write-Host "== One-step Claude attach =="
@@ -62,6 +69,8 @@ Write-Host "  Hooks: .claude\settings.local.json"
 Write-Host "  MCP:   .mcp.json .cursor\mcp.json .vscode\mcp.json .gemini\settings.json .codex\config.toml"
 Write-Host "  Log:   .local-evidence\claude-agent"
 Write-Host "  Verify a pack with: go\trajir.exe verify <pack.tir>"
+Write-Host ".local-evidence/ is listed in the target .gitignore."
+Write-Host "MCP command paths are absolute on this machine."
 Write-Host "The user profile at $env:USERPROFILE\.claude was not changed."
 Write-Host "Console is 127.0.0.1:8787 only. A listener already on that port is left alone."
 Write-Host "INSTALL OK"

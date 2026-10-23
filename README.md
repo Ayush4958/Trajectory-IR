@@ -124,7 +124,7 @@ pwsh -File scripts\install_claude.ps1 -Target C:\path\to\other\repo
 
 `--target` writes the config into that directory. The hook scripts stay in this install. The same step writes Cursor, VS Code, Gemini CLI, and Codex project MCP config. Those entries do not seal the host's own tools. LangGraph and ADK snippets land in `.trajir/` and import their libraries only when called.
 
-The first PreToolUse exits 0 after the seal so the host can run the tool. A second PreToolUse for the same `NON_IDEMPOTENT_WRITE` `tool_use_id` exits 2. The hook does not call the tool and does not start DBOS. If the diary write fails after the tool has already run, PostToolUse still exits 0.
+The first PreToolUse exits 0 after the seal so the host can run the tool. Another PreToolUse for that same id, while the call is still pending, also exits 0. Two hook registrations then do not block the first run. After PostToolUse records the result, a later PreToolUse for that `NON_IDEMPOTENT_WRITE` id exits 2. A recorded row with no effect class exits 2 as well. The hook does not call the tool and does not start DBOS. PostToolUse is best-effort: if the diary write fails, it still exits 0, and the tool-call row is stored only after the tool has run.
 
 If `127.0.0.1:8787` is free, the installer starts `trajir-console` there. If something is already listening, it leaves that process alone. `--skip-console` skips the start. There is no second console.
 

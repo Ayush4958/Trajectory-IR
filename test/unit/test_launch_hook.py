@@ -36,7 +36,7 @@ def test_missing_script_exits_2_on_pre_and_0_on_post(tmp_path: Path) -> None:
     assert launch_main(["only-one"]) == 2
 
 
-def test_subprocess_second_bash_exits_2(tmp_path: Path) -> None:
+def test_subprocess_duplicate_bash_exits_0_until_recorded(tmp_path: Path) -> None:
     work = tmp_path / "work"
     ident = tmp_path / "id.json"
     ident.write_text(
@@ -61,7 +61,17 @@ def test_subprocess_second_bash_exits_2(tmp_path: Path) -> None:
     first = subprocess.run(cmd, input=event, text=True, capture_output=True, env=env, check=False)
     assert first.returncode == 0, first.stderr
     second = subprocess.run(cmd, input=event, text=True, capture_output=True, env=env, check=False)
-    assert second.returncode == 2, second.stderr
+    assert second.returncode == 0, second.stderr
     state = json.loads((work / "hook_state.json").read_text(encoding="utf-8"))
     assert state["next_step"] == 2
     assert "replay" not in state["pending"]["bash-sub"]
+
+    post = _ROOT / "integrations" / "claude" / "post_tool_use.py"
+    recorded = json.dumps({"tool_use_id": "bash-sub", "tool_response": {"ok": True}})
+    post_cmd = [sys.executable, str(_LAUNCH), str(ident), str(post), "post"]
+    wrote = subprocess.run(
+        post_cmd, input=recorded, text=True, capture_output=True, env=env, check=False
+    )
+    assert wrote.returncode == 0, wrote.stderr
+    third = subprocess.run(cmd, input=event, text=True, capture_output=True, env=env, check=False)
+    assert third.returncode == 2, third.stderr
