@@ -7,29 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [0.2.3] - 2026-10-20
-
 ### Added
 
 - One local command attaches Claude Code in this checkout:
   `scripts/install_claude.ps1` and `scripts/install_claude.sh`. It builds
   `trajir.exe` and `trajir-mcp.exe`, merges project-local hooks and
   `.mcp.json`, and smoke-verifies one pack. The user profile is not edited
-  and the console is not started.
+  and the console is not started. This is not a `v0.2.3` release.
 - Claude PreToolUse seals the decision and exits 2 if the seal fails.
-  PostToolUse records the result. PostToolUseFailure records a
-  host-reported failure and clears the pending row. The hook writes the
-  log and does not start DBOS. LangGraph `TrajIRToolGuard` remains the
-  wrap that gates the tool body. Google ADK `AdkToolGuard` seals before
-  the tool and records the response the host already has.
+  PostToolUse records the result after the tool has run. That hook is
+  best-effort: a diary error is swallowed and the process still exits 0.
+  PostToolUseFailure records a host-reported failure and clears the
+  pending row. The hook writes the log and does not start DBOS.
+  LangGraph `TrajIRToolGuard` remains the wrap that gates the tool body.
+  Google ADK `AdkToolGuard` seals before the tool and records the
+  response the host already has.
 - Article 12 field map in `docs/ARTICLE_12_FIELD_MAP.md` and the one-step
   page `website/docs/one-step.md`. The map names pack fields. It is not a
   compliance claim.
-- Also on this cut, already merged to main: unsigned `.tir` loads reject
-  duplicate zip members, Postgres `Append` returns the slot-lookup error,
-  an S3 outage is not reported as a missing object, Go memo keys are
-  `tenant|workflow`, id length counts characters, and `node_id` checks
-  every preimage field.
 - Seal-derived idempotency keys on every `TOOL_CALL`. Format is
   `hex(sha256(length-prefixed utf-8 fields))` with domain
   `trajir-idempotency-v1`: each field is `uint32be(byte length) || utf-8`,
@@ -74,11 +69,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Unsigned `.tir` loads reject duplicate zip members (#469). Postgres
+  `Append` returns the slot-lookup error (#465). An S3 outage is not
+  reported as a missing object (#467). Go memo keys are `tenant|workflow`
+  (#471). Id length counts characters (#466). `node_id` checks every
+  preimage field (#468).
 - Postgres open paths bound ping and schema setup (default 10s, DSN
   `connect_timeout`, or `TRAJIR_PG_CONNECT_TIMEOUT`). S3 clients set an
   explicit 10s connect timeout and 60s read deadline (#406).
 - Go: `ClaimToolCall` (SQLite and Postgres) now returns real insert errors instead of
-  reporting "not claimed"; only a unique-slot conflict means another writer won.
+  reporting "not claimed"; only a unique-slot conflict means another writer won (#458).
   Postgres connection errors from `OpenDSN` have the DSN password scrubbed while
   still unwrapping to the cause. Payload numbers read back by `ListNodes` are
   `json.Number`, so integers above 2^53 survive, and a `payload_json` with trailing

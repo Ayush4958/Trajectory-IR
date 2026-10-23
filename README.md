@@ -118,14 +118,19 @@ pwsh -File scripts\install_claude.ps1
 
 ```bash
 ./scripts/install_claude.sh
-./go/trajir.exe verify pack.tir
+```
+
+Verify a pack you exported. There is no `pack.tir` until something writes one:
+
+```bash
+./go/trajir.exe verify path/to/pack.tir
 ```
 
 What that command already does:
 
 1. Builds `go/trajir.exe` and `go/trajir-mcp.exe`. The names keep the `.exe` suffix on every OS, because `go/trajir` is the package directory.
 2. Merges `PreToolUse`, `PostToolUse`, and `PostToolUseFailure` into `.claude/settings.local.json`, and merges the MCP server into `.mcp.json`. Existing JSON is kept. A file that is not a JSON object is left unchanged.
-3. Seals the decision in PreToolUse. If that write fails, the hook exits 2 and Claude does not run the tool. Claude then runs the tool. PostToolUse records the result. PostToolUseFailure records a failed tool and clears the pending row.
+3. Seals the decision in PreToolUse. If that write fails, the hook exits 2 and the tool does not run. If it succeeds, the tool runs and `PostToolUse` records the result. PostToolUse is best-effort: errors are swallowed and the hook exits 0. On this Claude path the tool-call row is stored only after the tool runs. PostToolUseFailure records a failed tool and clears the pending row.
 4. Writes the log directly. This path does not start DBOS.
 5. Smoke-verifies one local pack before it prints `INSTALL OK`.
 
@@ -215,7 +220,7 @@ Same agent, two modes: **live** does the job; **sandbox** refuses dangerous *cla
 |---|---|
 | Spec | `spec-v0.2-draft` — [master specification](docs/MASTER_SPECIFICATION.md) |
 | Phase | **1C harden and adopt** (Go primary; Python parity) — see [docs/ROADMAP.md](docs/ROADMAP.md) |
-| Library | **0.2.3** — one local command attaches Claude Code in this checkout |
+| Library | **0.2.2** on the latest tag. The one-step Claude attach on this branch is unreleased. There is no `v0.2.3` tag |
 | OpenSSF Best Practices | [Project 14075](https://www.bestpractices.dev/projects/14075) |
 | CNCF Sandbox | Preparing — [outline](docs/CNCF_SANDBOX_APPLICATION_OUTLINE.md). **Not** claiming CNCF membership until TOC approval |
 | Adopters | Honest empty list — [ADOPTERS.md](ADOPTERS.md) (add yourself via PR when you consent) |
