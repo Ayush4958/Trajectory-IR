@@ -135,9 +135,7 @@ jobs:
           python -m build
 
       - name: Wheel layout
-        run: |
-          python -m pip install pytest
-          pytest test/integration/test_wheel_layout.py -q
+        run: python test/integration/test_wheel_layout.py
 
       - name: Install wheel into clean environment and smoke import
         run: |
