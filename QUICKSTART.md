@@ -49,7 +49,7 @@ PyPI publish of ``trajectory-ir`` is a maintainer step after the git tag (see ``
 ## 2. Minimal Python flow (client + NodeLog, reference port)
 
 ```python
-from client.python.trajectory_client import (
+from trajectory_ir.client.python.trajectory_client import (
     open_trajectory,
     project,
     seal_decision,
@@ -78,7 +78,15 @@ print(result.result)  # hi
 commit_step(traj, step_n=1, seq=4)
 ```
 
+This flow only needs a base install. `open_trajectory` and `resume` also start
+DBOS when the `dbos` extra is installed (`.[dev]` includes it), for host code
+that uses DBOS steps. Pass `durable=True` to fail if `trajectory-ir[dbos]` is
+missing, or `durable=False` to skip DBOS.
+
 ### Durable step runner (DBOS)
+
+Needs the `dbos` extra (`pip install "trajectory-ir[dbos]"`, or `.[dev]` in
+this repo). `make_run_step` with injected hooks for another backend does not.
 
 For full seal/resume with DBOS steps, use `make_run_step` as in
 `examples/kill_mid_deploy/agent.py` (used by R01/R02 and e2e tests).
@@ -134,7 +142,7 @@ else:
 ## 5. Sandbox mode (R06)
 
 ```python
-from client.python.trajectory_client import open_trajectory, exec_tool
+from trajectory_ir.client.python.trajectory_client import open_trajectory, exec_tool
 from trajectory_ir.effects import EffectClass
 from trajectory_ir.runtime.tool import Tool
 
@@ -222,7 +230,7 @@ pip install -e ".[dev,postgres]"
 ```
 
 ```python
-from drivers.postgres.log import open_postgres_node_log
+from trajectory_ir.drivers.postgres.log import open_postgres_node_log
 
 log = open_postgres_node_log()  # TRAJIR_DATABASE_URL
 log.append("DECISION", 1, {"plan": {}}, "e2e-pg", "demo", seq=1)
@@ -243,7 +251,7 @@ pip install -e ".[dev,s3]"
 ```
 
 ```python
-from drivers.s3.cas import S3CAS, build_s3_client_from_env
+from trajectory_ir.drivers.s3.cas import S3CAS, build_s3_client_from_env
 from trajectory_ir.storage import put_artifact, rehydrate_artifacts
 
 store = S3CAS(build_s3_client_from_env(), bucket="trajir")

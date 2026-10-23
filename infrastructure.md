@@ -78,7 +78,7 @@ To ensure high quality, deterministic builds, and rapid iteration, we enforce st
 This repository is maintained by human owners collaborating with AI agents (specifically the Antigravity IDE and the Everything Claude Code [ECC] specialized subagent suite). As documented in `docs/MASTER_SPECIFICATION.md` Section 15, we mandate the following developer and AI workflow:
 
 1. **Planner Agent**: Must be invoked for any new architecture or module to draft an `implementation_plan.md` before coding.
-2. **TDD-Guide Agent**: All modules in `pkg/` and `drivers/` are built test-first. Test coverage must exceed 80%.
+2. **TDD-Guide Agent**: All modules in `pkg/` and `pkg/trajectory_ir/drivers/` are built test-first. Test coverage must exceed 80%.
 3. **Security-Review Agent (Procedural Governance Gate)**: Must be invoked before merging any modifications to `pkg/effects/` (tool safety boundaries) and `pkg/resume/` (block-and-gate logic). Unlike automated CI checks, this is a mandatory procedural code review and human maintainer sign-off policy designed to ensure maximum scrutiny on sensitive boundary logic.
 
 ### 2.3 CI/CD Pipeline (GitHub Actions)
@@ -121,9 +121,9 @@ When building, code must be placed strictly according to this physical infrastru
 * **`pkg/trajectory_ir/runtime/`**: Core logic (Nodes, Trajectory logic, JCS hashing). No DBOS/backend code belongs here.
 * **`pkg/trajectory_ir/effects/`**: Tool safety classes and MCP mappings.
 * **`pkg/trajectory_ir/resume/`**: The block-and-gate protocol semantics.
-* **`drivers/durable-backend/dbos/`**: The ONLY place where DBOS imports and workflow step wrappers exist.
+* **`pkg/trajectory_ir/drivers/durable_backend/dbos/`**: The ONLY place where DBOS imports and workflow step wrappers exist.
 * **`conformance/`**: The R01-R08 tests that prove the drivers work. 
 * **`examples/kill_mid_deploy/`**: A runnable E2E harness demonstrating crash-safety in the real world.
 
 > [!WARNING]
-> **Boundary Violation Rule**: The `pkg/trajectory_ir/runtime/` module must **never** import `dbos`. All durable execution logic must remain completely isolated behind the interface in `drivers/durable-backend/`.
+> **Boundary Violation Rule**: The `pkg/trajectory_ir/runtime/` module must **never** import `dbos`. All durable execution logic must remain completely isolated behind the interface in `pkg/trajectory_ir/drivers/durable_backend/`.

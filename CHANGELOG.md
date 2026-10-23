@@ -13,7 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `scripts/install_claude.ps1` and `scripts/install_claude.sh`. It builds
   `trajir.exe` and `trajir-mcp.exe`, merges project-local hooks and
   `.mcp.json`, and smoke-verifies one pack. The user profile is not edited
-  and the console is not started. This is not a `v0.2.3` release.
+  and the console is not started. This command is not a tagged release.
 - Claude PreToolUse seals the decision and exits 2 if the seal fails.
   PostToolUse records the result after the tool has run. That hook is
   best-effort: a diary error is swallowed and the process still exits 0.
@@ -45,6 +45,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **BREAKING:** Python `client` and `drivers` are packages under
+  `trajectory_ir` (0.3.0). The wheel no longer installs top-level modules
+  with those names (#459). Hosts need to update imports:
+
+  `from client.python.trajectory_client import open_trajectory`
+  -> `from trajectory_ir.client.python.trajectory_client import open_trajectory`
+
+  `from drivers.durable_backend.dbos.adapter import init_backend`
+  -> `from trajectory_ir.drivers.durable_backend.dbos.adapter import init_backend`
+
+  `from drivers.postgres.log import open_postgres_node_log`
+  -> `from trajectory_ir.drivers.postgres.log import open_postgres_node_log`
+
+  `from drivers.s3.cas import S3CAS`
+  -> `from trajectory_ir.drivers.s3.cas import S3CAS`
 - **Docs honesty:** landing README, scope card, master spec §7.2/§7.3/§8.3/§8.4
   now state the actual invariants. Honest resume freezes the plan, not the
   world. Block-and-gate is at-most-one automatic attempt, not "the world still
@@ -66,6 +81,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   before this change are not found: a step that was in flight during the
   upgrade calls the model again. Gated `NON_IDEMPOTENT_WRITE` tools still
   block on the existing `TOOL_CALL` claim and do not re-run.
+- `dbos` is no longer a core Python dependency. Install `trajectory-ir[dbos]`
+  for the DBOS backend (default `make_run_step` hooks). The client no longer
+  imports DBOS at load time. `open_trajectory` / `resume` start DBOS only when
+  the extra is installed; `durable=True` requires it and `durable=False` skips
+  it (#451).
 
 ### Fixed
 
@@ -74,6 +94,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   reported as a missing object (#467). Go memo keys are `tenant|workflow`
   (#471). Id length counts characters (#466). `node_id` checks every
   preimage field (#468).
+- Go `PayloadHash` refuses Go integer values and JSON integer literals
+  outside `-(2^53-1) .. 2^53-1`, matching Python rfc8785. Floats still
+  hash. SQLite, Postgres, and `.tir` load keep number text with
+  `UseNumber`, so a stored integer above that range cannot hash as a
+  rounded float (#461).
+- A Python plan with an integer outside the RFC 8785 safe range is rejected
+  before the durable memo stores a success. On the local memo, the same
+  workflow id calls the model again when no `DECISION` exists. DBOS records
+  the raised error on that workflow id and does not call the model again. A
+  new DBOS workflow id does. A tool result with one of those integers is
+  stored as `TOOL_RESULT` `{"error": "integer_domain", "message": "...",
+  "result_digest": "<sha256>"}` instead of `{"result": ...}`. Resume raises
+  that storage error instead of `BLOCKED_NEEDS_GATE`. Plain tools check that
+  stored failure before they run again. A non-object plan is rejected inside
+  the infer wrapper, before the durable memo records a success (#463).
 - Postgres open paths bound ping and schema setup (default 10s, DSN
   `connect_timeout`, or `TRAJIR_PG_CONNECT_TIMEOUT`). S3 clients set an
   explicit 10s connect timeout and 60s read deadline (#406).

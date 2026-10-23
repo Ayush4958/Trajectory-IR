@@ -182,7 +182,7 @@ started = time.perf_counter()
 seal_before_tool(sys.argv[1], "demo", "cold", "echo", {"msg": "hi"}, "use-cold")
 print(json.dumps({
     "dbos": "dbos" in sys.modules,
-    "client": "client.python.trajectory_client" in sys.modules,
+    "client": "trajectory_ir.client.python.trajectory_client" in sys.modules,
     "elapsed": time.perf_counter() - started,
 }))
 """
