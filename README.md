@@ -122,6 +122,8 @@ pwsh -File scripts\install_claude.ps1
 ./scripts/install_claude.sh
 ```
 
+PowerShell uses `TRAJIR_PYTHON`, then `.venv\Scripts\python.exe`, then `python`. The shell script uses `TRAJIR_PYTHON`, then `.venv/bin/python`, then `python3`, then `python`. That interpreter is what the hook command runs.
+
 Verify a pack you exported. There is no `pack.tir` until something writes one:
 
 ```bash
@@ -131,8 +133,8 @@ Verify a pack you exported. There is no `pack.tir` until something writes one:
 What that command already does:
 
 1. Builds `go/trajir.exe` and `go/trajir-mcp.exe`. The names keep the `.exe` suffix on every OS, because `go/trajir` is the package directory.
-2. Merges `PreToolUse`, `PostToolUse`, and `PostToolUseFailure` into `.claude/settings.local.json`, and merges the MCP server into `.mcp.json`. Existing JSON is kept. A file that is not a JSON object is left unchanged.
-3. Seals the decision in PreToolUse. If that write fails, the hook exits 2 and the tool does not run. If it succeeds, the tool runs and `PostToolUse` records the result. PostToolUse is best-effort: errors are swallowed and the hook exits 0. On this Claude path the tool-call row is stored only after the tool runs. PostToolUseFailure records a failed tool and clears the pending row.
+2. Merges `PreToolUse`, `PostToolUse`, and `PostToolUseFailure` into `.claude/settings.local.json`, and merges the MCP server into `.mcp.json`. Existing JSON objects are kept. Invalid JSON, including a comment or a trailing comma, is left as it is and the command exits 1, so the smoke check does not run. Claude Code asks you to approve the project MCP server before that server starts.
+3. Seals the decision in PreToolUse. A seal error on this call exits 2 and Claude skips that tool. The next call is a new process, so a missing tool id or a lock timeout does not block later tools. If the python in the hook command cannot import this repo, every call exits 2 until you run the installer again. When the seal succeeds, the tool runs and `PostToolUse` records the result. PostToolUse is best-effort: errors are swallowed and the hook exits 0. On this Claude path the tool-call row is stored only after the tool runs. PostToolUseFailure records a failed tool and clears the pending row. If Claude denies the tool after the seal, neither post hook runs. The pending row stays in `.local-evidence/claude-agent/hook_state.json` and the decision stays in the log. The next tool is a new step. Leave that row. There is no cleanup command.
 4. Writes the log directly. This path does not start DBOS.
 5. Smoke-verifies one local pack before it prints `INSTALL OK`.
 
@@ -222,7 +224,7 @@ Same agent, two modes: **live** does the job; **sandbox** refuses dangerous *cla
 |---|---|
 | Spec | `spec-v0.2-draft` — [master specification](docs/MASTER_SPECIFICATION.md) |
 | Phase | **1C harden and adopt** (Go primary; Python parity) — see [docs/ROADMAP.md](docs/ROADMAP.md) |
-| Library | **0.2.2** on the latest tag. The one-step Claude attach on this branch is unreleased. There is no `v0.2.3` tag |
+| Library | Latest tag is **v0.2.2**. `pyproject.toml` is **0.3.0** for the import move, and that version is not tagged. The one-step Claude attach is not its own release |
 | OpenSSF Best Practices | [Project 14075](https://www.bestpractices.dev/projects/14075) |
 | CNCF Sandbox | Preparing — [outline](docs/CNCF_SANDBOX_APPLICATION_OUTLINE.md). **Not** claiming CNCF membership until TOC approval |
 | Adopters | Honest empty list — [ADOPTERS.md](ADOPTERS.md) (add yourself via PR when you consent) |

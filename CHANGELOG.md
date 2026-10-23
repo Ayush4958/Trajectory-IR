@@ -89,6 +89,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- `scripts/install_claude.sh` uses `TRAJIR_PYTHON`, then `.venv/bin/python`,
+  then `python3`, then `python`. A bare `python` was written into the hook
+  command, so a machine with only `python3` exited 2 on every tool call.
 - Unsigned `.tir` loads reject duplicate zip members (#469). Postgres
   `Append` returns the slot-lookup error (#465). An S3 outage is not
   reported as a missing object (#467). Go memo keys are `tenant|workflow`

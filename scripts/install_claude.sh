@@ -16,8 +16,21 @@ test -f "$ROOT/go/trajir.exe"
 test -x "$ROOT/go/trajir.exe" || chmod +x "$ROOT/go/trajir.exe"
 test -f "$ROOT/go/trajir-mcp.exe"
 
-python "$ROOT/scripts/write_claude_local_config.py"
-python "$ROOT/scripts/local_one_step_smoke.py"
+# TRAJIR_PYTHON, then the repo venv, then python3, then python.
+# The hook command is this interpreter. A bare python that cannot
+# import the repo makes every later tool call exit 2.
+if [ -n "${TRAJIR_PYTHON:-}" ]; then
+  PY="$TRAJIR_PYTHON"
+elif [ -x "$ROOT/.venv/bin/python" ]; then
+  PY="$ROOT/.venv/bin/python"
+elif command -v python3 >/dev/null 2>&1; then
+  PY="python3"
+else
+  PY="python"
+fi
+
+"$PY" "$ROOT/scripts/write_claude_local_config.py"
+"$PY" "$ROOT/scripts/local_one_step_smoke.py"
 
 echo ""
 echo "Attached inside this worktree only."
