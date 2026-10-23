@@ -65,9 +65,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   before this change are not found: a step that was in flight during the
   upgrade calls the model again. Gated `NON_IDEMPOTENT_WRITE` tools still
   block on the existing `TOOL_CALL` claim and do not re-run.
+- `dbos` is no longer a core Python dependency. Install `trajectory-ir[dbos]`
+  for the DBOS backend (default `make_run_step` hooks). The client no longer
+  imports DBOS at load time. `open_trajectory` / `resume` start DBOS only when
+  the extra is installed; `durable=True` requires it and `durable=False` skips
+  it (#451).
 
 ### Fixed
 
+- Go `PayloadHash` refuses Go integer values and JSON integer literals
+  outside `-(2^53-1) .. 2^53-1`, matching Python rfc8785. Floats still
+  hash. SQLite, Postgres, and `.tir` load keep number text with
+  `UseNumber`, so a stored integer above that range cannot hash as a
+  rounded float (#461).
+- A Python plan with an integer outside the RFC 8785 safe range is rejected
+  before the durable memo stores a success. On the local memo, the same
+  workflow id calls the model again when no `DECISION` exists. DBOS records
+  the raised error on that workflow id and does not call the model again. A
+  new DBOS workflow id does. A tool result with one of those integers is
+  stored as `TOOL_RESULT` `{"error": "integer_domain", "message": "...",
+  "result_digest": "<sha256>"}` instead of `{"result": ...}`. Resume raises
+  that storage error instead of `BLOCKED_NEEDS_GATE`. Plain tools check that
+  stored failure before they run again. A non-object plan is rejected inside
+  the infer wrapper, before the durable memo records a success (#463).
 - Postgres open paths bound ping and schema setup (default 10s, DSN
   `connect_timeout`, or `TRAJIR_PG_CONNECT_TIMEOUT`). S3 clients set an
   explicit 10s connect timeout and 60s read deadline (#406).
