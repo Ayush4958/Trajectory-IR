@@ -175,9 +175,13 @@ func TestExecToolGated(t *testing.T) {
 	if _, err := tr.ExecTool(1, 2, tool, map[string]any{}); err != nil {
 		t.Fatal(err)
 	}
-	_, err = tr.ExecTool(1, 2, tool, map[string]any{})
-	if err == nil {
-		t.Fatal("expected block on second exec")
+	// Re-exec of a completed call hands back the recorded result, no second effect.
+	again, err := tr.ExecTool(1, 2, tool, map[string]any{})
+	if err != nil {
+		t.Fatalf("second exec: %v", err)
+	}
+	if again.Result != "ok" {
+		t.Fatalf("second exec result=%v, want ok", again.Result)
 	}
 	if n.Load() != 1 {
 		t.Fatalf("side effects=%d", n.Load())
@@ -602,5 +606,40 @@ func TestOpenTrajectoryRejectsSymlinkedSQLiteFiles(t *testing.T) {
 				t.Fatalf("symlink target was written through: %q", b)
 			}
 		})
+	}
+}
+
+func TestExecToolAgentSpawnGated(t *testing.T) {
+	dir := t.TempDir()
+	tr, err := client.OpenTrajectory("demo", "t-spawn", client.Options{WorkDir: dir})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer tr.Close()
+
+	step := 1
+	if _, err := tr.Log().Append(
+		"TOOL_CALL", &step,
+		map[string]any{"tool": "spawn_peer", "args": map[string]any{}},
+		"t-spawn", "demo", 2,
+	); err != nil {
+		t.Fatal(err)
+	}
+	var n atomic.Int32
+	tool := resume.Tool{
+		Name:   "spawn_peer",
+		Effect: effects.AGENT_SPAWN,
+		Fn: func(map[string]any) (any, error) {
+			n.Add(1)
+			return "peer", nil
+		},
+	}
+	_, err = tr.ExecTool(1, 2, tool, map[string]any{})
+	var blocked *resume.BlockedNeedsGate
+	if !errors.As(err, &blocked) {
+		t.Fatalf("err=%v, want BlockedNeedsGate", err)
+	}
+	if n.Load() != 0 {
+		t.Fatalf("peer spawned %d times, want 0", n.Load())
 	}
 }
