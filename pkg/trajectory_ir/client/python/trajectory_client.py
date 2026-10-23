@@ -94,7 +94,7 @@ def _init_durable_backend(db_path: str, durable: bool | None) -> None:
     # Imported here, not at module top: a top-level import is what forced
     # dbos into the core dependencies (#451).
     try:
-        from drivers.durable_backend.dbos.adapter import init_backend
+        from trajectory_ir.drivers.durable_backend.dbos.adapter import init_backend
     except ImportError:
         if durable:
             raise

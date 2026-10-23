@@ -31,7 +31,7 @@ def test_dbos_is_an_extra_not_a_core_dependency():
 
 def test_client_import_does_not_need_dbos():
     result = _run_without_dbos(
-        "import client.python.trajectory_client as c\n"
+        "import trajectory_ir.client.python.trajectory_client as c\n"
         "from trajectory_ir.runtime.log import NodeLog\n"
         "assert callable(c.project)\n"
         "print('ok')\n"
@@ -44,7 +44,7 @@ def test_open_trajectory_and_resume_work_without_dbos(tmp_path):
     # The QUICKSTART section 2 flow, then resume on the same log, on a base install.
     db = str(tmp_path / "qs.sqlite")
     result = _run_without_dbos(
-        "from client.python.trajectory_client import (\n"
+        "from trajectory_ir.client.python.trajectory_client import (\n"
         "    commit_step, exec_tool, open_trajectory, project, resume, seal_decision,\n"
         ")\n"
         "from trajectory_ir.effects import EffectClass\n"
@@ -77,7 +77,7 @@ def test_open_trajectory_and_resume_work_without_dbos(tmp_path):
 def test_durable_true_without_dbos_names_the_extra(tmp_path, call):
     db = str(tmp_path / "t.sqlite")
     result = _run_without_dbos(
-        "from client.python.trajectory_client import open_trajectory, resume\n"
+        "from trajectory_ir.client.python.trajectory_client import open_trajectory, resume\n"
         f"db = {db!r}\n"
         f"{call}\n"
     )
@@ -88,10 +88,12 @@ def test_durable_true_without_dbos_names_the_extra(tmp_path, call):
 def test_make_run_step_with_injected_hooks_does_not_need_dbos(tmp_path):
     db = str(tmp_path / "nodes.sqlite")
     result = _run_without_dbos(
-        "from drivers.durable_backend.restate import (\n"
+        "from trajectory_ir.drivers.durable_backend.restate import (\n"
         "    durable_infer, durable_tool, durable_workflow, init_backend,\n"
         ")\n"
-        "from drivers.durable_backend.restate.local_memo import clear_memo, workflow_scope\n"
+        "from trajectory_ir.drivers.durable_backend.restate.local_memo import (\n"
+        "    clear_memo, workflow_scope,\n"
+        ")\n"
         "from trajectory_ir.effects import EffectClass\n"
         "from trajectory_ir.resume.step import make_run_step\n"
         "from trajectory_ir.runtime.log import NodeLog\n"
@@ -118,8 +120,8 @@ def test_make_run_step_with_injected_hooks_does_not_need_dbos(tmp_path):
 
 
 def test_durable_flag_controls_dbos_launch(monkeypatch, tmp_path):
-    import client.python.trajectory_client as c
-    from drivers.durable_backend.dbos import adapter
+    import trajectory_ir.client.python.trajectory_client as c
+    from trajectory_ir.drivers.durable_backend.dbos import adapter
 
     launched = []
     monkeypatch.setattr(adapter, "init_backend", lambda db_path: launched.append(db_path))
