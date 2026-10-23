@@ -8,6 +8,7 @@ from __future__ import annotations
 import os
 import socket
 import subprocess
+import time
 from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
@@ -51,27 +52,68 @@ def start_console_if_free(
     detach: bool = True,
     probe: Callable[[], bool] | None = None,
     popen: Callable[..., subprocess.Popen[bytes]] | None = None,
+    confirm: bool = True,
+    wait_s: float = 5.0,
 ) -> ConsoleLaunch:
-    """Start the console, or report that 127.0.0.1:8787 is already taken."""
+    """Start the console, or report that 127.0.0.1:8787 is already taken.
+
+    ``status`` is ``already``, ``started``, or ``down``. ``down`` means the
+    process exited or never accepted a connection. ``confirm=False`` returns
+    after spawn and is for tests that do not open the port.
+    """
     listening = console_is_up if probe is None else probe
     if listening():
         return ConsoleLaunch("already")
     binary = console_binary(root)
-    data = Path(data_dir) if data_dir is not None else Path(root) / ".console-data"
+    if data_dir is not None:
+        data = Path(data_dir)
+    else:
+        data = Path(root) / ".local-evidence" / "console-data"
     data.mkdir(parents=True, exist_ok=True)
     cmd = [str(binary), "-addr", CONSOLE_ADDR, "-data", str(data)]
-    kwargs: dict[str, object] = {
-        "cwd": str(Path(root) / "go"),
-        "stdout": subprocess.DEVNULL,
-        "stderr": subprocess.DEVNULL,
-    }
+    cwd = str(Path(root) / "go")
+    stdout = subprocess.DEVNULL
+    stderr = subprocess.DEVNULL
+    creationflags = 0
+    start_new_session = False
     if detach:
         if os.name == "nt":
-            flags = getattr(subprocess, "DETACHED_PROCESS", 0)
-            flags |= getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0)
-            kwargs["creationflags"] = flags
+            creationflags = getattr(subprocess, "DETACHED_PROCESS", 0)
+            creationflags |= getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0)
         else:
-            kwargs["start_new_session"] = True
-    spawn = subprocess.Popen if popen is None else popen
-    process = spawn(cmd, **kwargs)
-    return ConsoleLaunch("started", process)
+            start_new_session = True
+    kwargs: dict[str, object] = {"cwd": cwd, "stdout": stdout, "stderr": stderr}
+    if creationflags:
+        kwargs["creationflags"] = creationflags
+    if start_new_session:
+        kwargs["start_new_session"] = True
+    if popen is not None:
+        process = popen(cmd, **kwargs)
+    elif creationflags:
+        process = subprocess.Popen(
+            cmd,
+            cwd=cwd,
+            stdout=stdout,
+            stderr=stderr,
+            creationflags=creationflags,
+        )
+    elif start_new_session:
+        process = subprocess.Popen(
+            cmd,
+            cwd=cwd,
+            stdout=stdout,
+            stderr=stderr,
+            start_new_session=True,
+        )
+    else:
+        process = subprocess.Popen(cmd, cwd=cwd, stdout=stdout, stderr=stderr)
+    if not confirm:
+        return ConsoleLaunch("started", process)
+    deadline = time.time() + wait_s
+    while time.time() < deadline:
+        if listening():
+            return ConsoleLaunch("started", process)
+        if process.poll() is not None:
+            return ConsoleLaunch("down", process)
+        time.sleep(0.05)
+    return ConsoleLaunch("down", process)

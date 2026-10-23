@@ -2,7 +2,7 @@
 # website/docs-site.workflow.yml is the same text, kept in the website tree
 # so a token without the workflow scope can still review it. Keep the two
 # copies the same. A pull request uses its own concurrency group, so it
-# cannot cancel a Pages deploy from main.
+# cannot cancel a Pages deploy from main. cancel-in-progress is off on main.
 
 name: Docs site
 
@@ -23,7 +23,7 @@ permissions:
 
 concurrency:
   group: pages-${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
 jobs:
   build:

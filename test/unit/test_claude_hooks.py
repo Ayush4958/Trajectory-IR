@@ -82,11 +82,12 @@ def test_failure_hook_records_abort_and_ignores_bad_json(monkeypatch, tmp_path: 
     assert "fail-1" not in state["pending"]
 
 
-def test_duplicate_pre_tool_while_pending_exits_0(monkeypatch, tmp_path: Path) -> None:
-    """Two hook registrations see the same call before the tool runs."""
+def test_same_owner_pending_bash_exits_2(monkeypatch, tmp_path: Path) -> None:
+    """The same hook asking again before PostToolUse does not run Bash again."""
     monkeypatch.setenv("TRAJIR_WORK_DIR", str(tmp_path))
     monkeypatch.setenv("TRAJIR_TENANT_ID", "demo")
     monkeypatch.setenv("TRAJIR_TRAJECTORY_ID", "stdin-gate")
+    monkeypatch.setenv("TRAJIR_HOOK_OWNER", "project")
     event = {
         "tool_name": "Bash",
         "tool_use_id": "bash-dup",
@@ -95,7 +96,7 @@ def test_duplicate_pre_tool_while_pending_exits_0(monkeypatch, tmp_path: Path) -
     monkeypatch.setattr("sys.stdin", StringIO(json.dumps(event)))
     assert pre_main() == 0
     monkeypatch.setattr("sys.stdin", StringIO(json.dumps(event)))
-    assert pre_main() == 0
+    assert pre_main() == 2
     state = json.loads((tmp_path / "hook_state.json").read_text(encoding="utf-8"))
     assert state["next_step"] == 2
     assert "replay" not in state["pending"]["bash-dup"]
@@ -108,7 +109,30 @@ def test_duplicate_pre_tool_while_pending_exits_0(monkeypatch, tmp_path: Path) -
     assert [row["kind"] for row in rows].count("DECISION") == 1
 
 
-def test_pending_row_without_effect_class_does_not_block(monkeypatch, tmp_path: Path) -> None:
+def test_other_owner_pending_bash_exits_0(monkeypatch, tmp_path: Path) -> None:
+    """A second registration is not a crash retry."""
+    monkeypatch.setenv("TRAJIR_WORK_DIR", str(tmp_path))
+    monkeypatch.setenv("TRAJIR_TENANT_ID", "demo")
+    monkeypatch.setenv("TRAJIR_TRAJECTORY_ID", "stdin-other")
+    monkeypatch.setenv("TRAJIR_HOOK_OWNER", "project")
+    event = {
+        "tool_name": "Bash",
+        "tool_use_id": "bash-other",
+        "tool_input": {"command": "echo hi"},
+    }
+    monkeypatch.setattr("sys.stdin", StringIO(json.dumps(event)))
+    assert pre_main() == 0
+    monkeypatch.setenv("TRAJIR_HOOK_OWNER", "user")
+    monkeypatch.setattr("sys.stdin", StringIO(json.dumps(event)))
+    assert pre_main() == 0
+    state = json.loads((tmp_path / "hook_state.json").read_text(encoding="utf-8"))
+    assert state["pending"]["bash-other"]["owner"] == "project"
+    assert "replay" not in state["pending"]["bash-other"]
+
+
+def test_pending_row_without_effect_class_blocks_the_same_owner(
+    monkeypatch, tmp_path: Path
+) -> None:
     monkeypatch.setenv("TRAJIR_WORK_DIR", str(tmp_path))
     monkeypatch.setenv("TRAJIR_TENANT_ID", "demo")
     monkeypatch.setenv("TRAJIR_TRAJECTORY_ID", "stdin-empty-effect")
@@ -123,6 +147,9 @@ def test_pending_row_without_effect_class_does_not_block(monkeypatch, tmp_path: 
     state = json.loads(state_path.read_text(encoding="utf-8"))
     del state["pending"]["bash-empty"]["effect_class"]
     state_path.write_text(json.dumps(state), encoding="utf-8")
+    monkeypatch.setattr("sys.stdin", StringIO(json.dumps(event)))
+    assert pre_main() == 2
+    monkeypatch.setenv("TRAJIR_HOOK_OWNER", "user")
     monkeypatch.setattr("sys.stdin", StringIO(json.dumps(event)))
     assert pre_main() == 0
 
@@ -195,6 +222,18 @@ def test_read_only_replay_still_exits_0(monkeypatch, tmp_path: Path) -> None:
     state = json.loads((tmp_path / "hook_state.json").read_text(encoding="utf-8"))
     assert state["pending"]["ro-1"]["effect_class"] == "READ_ONLY"
     assert "replay" not in state["pending"]["ro-1"]
+
+
+def test_missing_identity_file_names_the_installer(monkeypatch, tmp_path: Path, capsys) -> None:
+    missing = tmp_path / "missing.json"
+    monkeypatch.setenv("TRAJIR_IDENTITY_FILE", str(missing))
+    event = {"tool_name": "Bash", "tool_use_id": "id-miss", "tool_input": {"command": "true"}}
+    monkeypatch.setattr("sys.stdin", StringIO(json.dumps(event)))
+    assert pre_main() == 2
+    err = capsys.readouterr().err
+    assert "install_claude" in err
+    assert "missing.json" in err
+    assert not (tmp_path / "nodes.sqlite").exists()
 
 
 def test_identity_file_picks_the_work_dir(monkeypatch, tmp_path: Path) -> None:

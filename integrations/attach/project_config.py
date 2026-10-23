@@ -28,7 +28,8 @@ _JSON_RELATIVE = {
 
 
 def _command(py: str, launcher: Path, identity: Path, script: Path, kind: str) -> str:
-    return f'"{py}" "{launcher}" "{identity}" "{script}" "{kind}"'
+    # The last word is the hook owner. A second registration must use another word.
+    return f'"{py}" "{launcher}" "{identity}" "{script}" "{kind}" "project"'
 
 
 def _read_object(path: Path) -> dict | None:
@@ -48,7 +49,8 @@ def _write_json(path: Path, payload: dict) -> None:
     path.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
 
 
-def _with_hook(settings: dict, event: str, script: Path, command: str) -> dict:
+def _with_hook(settings: dict, event: str, command: str, match: str) -> dict:
+    """Refresh our launcher command. Leave a user hook that does not use it."""
     hooks = settings.get("hooks")
     hooks = dict(hooks) if isinstance(hooks, dict) else {}
     groups = hooks.get(event)
@@ -65,7 +67,8 @@ def _with_hook(settings: dict, event: str, script: Path, command: str) -> dict:
             continue
         new_hooks: list[object] = []
         for hook in hook_list:
-            if isinstance(hook, dict) and script.name in str(hook.get("command") or ""):
+            text = str(hook.get("command") or "") if isinstance(hook, dict) else ""
+            if isinstance(hook, dict) and match and match in text:
                 new_hooks.append({**hook, "command": command})
                 replaced = True
             else:
@@ -85,10 +88,11 @@ def _merged_settings(
 ) -> dict:
     settings = dict(existing or {})
     launcher = install / "integrations" / "attach" / "launch_hook.py"
+    match = str(launcher)
     for event, name, kind in _HOOK_EVENTS:
         script = install / "integrations" / "claude" / name
         command = _command(py, launcher, identity, script, kind)
-        settings = _with_hook(settings, event, script, command)
+        settings = _with_hook(settings, event, command, match)
     return settings
 
 
@@ -191,22 +195,41 @@ def _adk_snippet(install: Path, dest: Path) -> str:
     )
 
 
-def _ignore_local_evidence(dest: Path) -> None:
-    """Keep tool args and results out of git. Leave an existing rule alone."""
+_GENERATED_IGNORES = (
+    ".local-evidence/",
+    ".claude/settings.local.json",
+    ".mcp.json",
+    ".cursor/mcp.json",
+    ".vscode/mcp.json",
+    ".gemini/settings.json",
+    ".codex/config.toml",
+    ".trajir/*.py",
+)
+
+
+def _ignore_line_present(current: str, needle: str) -> bool:
+    lines = {line.strip() for line in current.splitlines()}
+    if needle in lines:
+        return True
+    return needle == ".local-evidence/" and ".local-evidence" in lines
+
+
+def _ignore_generated(dest: Path) -> None:
+    """Keep generated absolute paths out of git. Add only the missing lines."""
     dest.mkdir(parents=True, exist_ok=True)
     path = dest / ".gitignore"
-    needle = ".local-evidence/"
     try:
         current = path.read_text(encoding="utf-8") if path.is_file() else ""
     except OSError as exc:
         print(f"trajir attach: left .gitignore unread ({exc})", file=sys.stderr)
         return
-    if any(line.strip() in {needle, ".local-evidence"} for line in current.splitlines()):
+    missing = [line for line in _GENERATED_IGNORES if not _ignore_line_present(current, line)]
+    if not missing:
         return
     prefix = ""
     if current and not current.endswith("\n"):
         prefix = "\n"
-    path.write_text(current + f"{prefix}{needle}\n", encoding="utf-8")
+    path.write_text(current + prefix + "\n".join(missing) + "\n", encoding="utf-8")
 
 
 def write_local_config(
@@ -231,7 +254,7 @@ def write_local_config(
         print(f"trajir claude config: {exc}", file=sys.stderr)
         return 1
 
-    _ignore_local_evidence(dest)
+    _ignore_generated(dest)
     work = dest / ".local-evidence" / "claude-agent"
     work.mkdir(parents=True, exist_ok=True)
     identity = {

@@ -22,6 +22,7 @@ def _clean_env() -> dict[str, str]:
         "TRAJIR_TENANT_ID",
         "TRAJIR_TRAJECTORY_ID",
         "TRAJIR_IDENTITY_FILE",
+        "TRAJIR_HOOK_OWNER",
     ):
         env.pop(key, None)
     return env
@@ -36,7 +37,40 @@ def test_missing_script_exits_2_on_pre_and_0_on_post(tmp_path: Path) -> None:
     assert launch_main(["only-one"]) == 2
 
 
-def test_subprocess_duplicate_bash_exits_0_until_recorded(tmp_path: Path) -> None:
+def test_subprocess_other_owner_bash_exits_0(tmp_path: Path) -> None:
+    work = tmp_path / "work"
+    ident = tmp_path / "id.json"
+    ident.write_text(
+        json.dumps(
+            {
+                "work_dir": str(work),
+                "tenant_id": "local",
+                "trajectory_id": "launch-owner",
+            }
+        ),
+        encoding="utf-8",
+    )
+    event = json.dumps(
+        {
+            "tool_name": "Bash",
+            "tool_use_id": "bash-owner",
+            "tool_input": {"command": "echo hi"},
+        }
+    )
+    env = _clean_env()
+    first_cmd = [sys.executable, str(_LAUNCH), str(ident), str(_PRE), "pre", "project"]
+    second_cmd = [sys.executable, str(_LAUNCH), str(ident), str(_PRE), "pre", "user"]
+    first = subprocess.run(
+        first_cmd, input=event, text=True, capture_output=True, env=env, check=False
+    )
+    assert first.returncode == 0, first.stderr
+    second = subprocess.run(
+        second_cmd, input=event, text=True, capture_output=True, env=env, check=False
+    )
+    assert second.returncode == 0, second.stderr
+
+
+def test_subprocess_duplicate_bash_exits_2_before_record(tmp_path: Path) -> None:
     work = tmp_path / "work"
     ident = tmp_path / "id.json"
     ident.write_text(
@@ -61,7 +95,7 @@ def test_subprocess_duplicate_bash_exits_0_until_recorded(tmp_path: Path) -> Non
     first = subprocess.run(cmd, input=event, text=True, capture_output=True, env=env, check=False)
     assert first.returncode == 0, first.stderr
     second = subprocess.run(cmd, input=event, text=True, capture_output=True, env=env, check=False)
-    assert second.returncode == 0, second.stderr
+    assert second.returncode == 2, second.stderr
     state = json.loads((work / "hook_state.json").read_text(encoding="utf-8"))
     assert state["next_step"] == 2
     assert "replay" not in state["pending"]["bash-sub"]

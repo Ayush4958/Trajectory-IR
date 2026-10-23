@@ -1,15 +1,18 @@
 """Claude Code PreToolUse hook. Seals the decision, then exits.
 
-Exit 0 lets the host run the tool the first time. A second hook for the
-same still-pending tool_use_id also exits 0, so two registrations do not
-block the first run. Exit 2 blocks when the seal did not land, or when
-this tool_use_id was already recorded and the effect is gated or unknown.
-The tool body is not called from this process.
+Exit 0 lets the host run the tool the first time. The same hook owner
+asking again while that call is pending exits 2 when the effect is gated
+or missing. That is a crash before PostToolUse. A different owner on the
+pending call exits 0, so two registrations do not block the first run.
+Exit 2 also blocks when the seal did not land, or when this tool_use_id
+was already recorded and the effect is gated or unknown. The tool body
+is not called from this process.
 """
 
 from __future__ import annotations
 
 import json
+import os
 import sys
 from pathlib import Path
 
@@ -69,6 +72,7 @@ def main() -> int:
             args,
             tool_use_id(event),
             annotations=_annotations(event),
+            owner=os.environ.get("TRAJIR_HOOK_OWNER", "").strip(),
         )
     except Exception as exc:
         print(f"trajir pre-tool seal failed: {exc}", file=sys.stderr)

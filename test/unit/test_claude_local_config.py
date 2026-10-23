@@ -95,8 +95,24 @@ def test_target_dir_keeps_hooks_in_the_install(tmp_path: Path) -> None:
     )
     assert ident["work_dir"].startswith(str(target))
     assert Path(ident["work_dir"]).is_absolute()
-    ignore = (target / ".gitignore").read_text(encoding="utf-8")
-    assert ".local-evidence/" in ignore.splitlines()
+    ignore = (target / ".gitignore").read_text(encoding="utf-8").splitlines()
+    for line in (
+        ".local-evidence/",
+        ".claude/settings.local.json",
+        ".mcp.json",
+        ".cursor/mcp.json",
+        ".vscode/mcp.json",
+        ".gemini/settings.json",
+        ".codex/config.toml",
+        ".trajir/*.py",
+    ):
+        assert line in ignore
+    launcher = next(
+        command
+        for command in commands
+        if "launch_hook.py" in command and "pre_tool_use.py" in command
+    )
+    assert launcher.endswith('"project"')
     mcp = json.loads((target / ".mcp.json").read_text(encoding="utf-8"))
     assert mcp["mcpServers"]["trajectory-ir"]["env"]["TRAJIR_MCP_ROOT"] == str(target)
     assert mcp["mcpServers"]["trajectory-ir"]["command"] == str(mcp_bin)
@@ -161,10 +177,83 @@ def test_relative_target_is_stored_absolute(monkeypatch, tmp_path: Path) -> None
     assert Path(command).is_absolute()
 
 
+def test_user_hook_that_only_names_the_script_is_kept(tmp_path: Path) -> None:
+    module = _load()
+    settings_path = tmp_path / ".claude" / "settings.local.json"
+    settings_path.parent.mkdir(parents=True)
+    user_cmd = "python pre_tool_use.py"
+    settings_path.write_text(
+        json.dumps(
+            {
+                "hooks": {
+                    "PreToolUse": [
+                        {"matcher": "*", "hooks": [{"type": "command", "command": user_cmd}]}
+                    ]
+                }
+            }
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    assert module.write_local_config(tmp_path, sys.executable, tmp_path / "trajir-mcp") == 0
+    commands = _commands(json.loads(settings_path.read_text(encoding="utf-8")))
+    assert user_cmd in commands
+    assert sum("launch_hook.py" in command for command in commands) == 3
+    assert module.write_local_config(tmp_path, sys.executable, tmp_path / "trajir-mcp") == 0
+    again = _commands(json.loads(settings_path.read_text(encoding="utf-8")))
+    assert again.count(user_cmd) == 1
+    assert sum("launch_hook.py" in command for command in again) == 3
+
+
+def test_gitignore_keeps_an_existing_local_evidence_line(tmp_path: Path) -> None:
+    module = _load()
+    target = tmp_path / "project"
+    target.mkdir()
+    (target / ".gitignore").write_text("keep-me\n.local-evidence\n", encoding="utf-8")
+    install = tmp_path / "install"
+    assert module.write_local_config(install, sys.executable, install / "mcp", target=target) == 0
+    lines = (target / ".gitignore").read_text(encoding="utf-8").splitlines()
+    assert lines[0] == "keep-me"
+    assert lines[1] == ".local-evidence"
+    assert ".local-evidence/" not in lines
+    assert ".mcp.json" in lines
+    assert ".trajir/*.py" in lines
+
+
+def test_console_down_exits_1(monkeypatch, tmp_path: Path, capsys) -> None:
+    module = _load()
+
+    def down(*_args: object, **_kwargs: object) -> object:
+        return type("Launch", (), {"status": "down"})()
+
+    monkeypatch.setattr(module, "start_console_if_free", down)
+    assert module.main(["--target", str(tmp_path)]) == 1
+    assert "console did not stay up" in capsys.readouterr().err
+
+
+def test_console_start_uses_the_target_data_dir(monkeypatch, tmp_path: Path) -> None:
+    module = _load()
+    seen: dict[str, object] = {}
+
+    def started(*_args: object, **kwargs: object) -> object:
+        seen["data"] = kwargs.get("data_dir")
+        return type("Launch", (), {"status": "started"})()
+
+    monkeypatch.setattr(module, "start_console_if_free", started)
+    assert module.main(["--target", str(tmp_path)]) == 0
+    expected = (tmp_path / ".local-evidence" / "console-data").resolve()
+    assert Path(str(seen["data"])) == expected
+
+
 def test_install_scripts_resolve_target_before_changing_directory() -> None:
     root = Path(__file__).resolve().parents[2]
     shell = (root / "scripts" / "install_claude.sh").read_text(encoding="utf-8")
     assert shell.index('TARGET="$(cd "$2" && pwd)"') < shell.index('cd "$ROOT"')
+    assert "TRAJIR_PYTHON" in shell
+    assert "command -v python3" in shell
+    assert shell.index("TRAJIR_PYTHON") < shell.index(
+        '"$PY" "$ROOT/scripts/write_claude_local_config.py"'
+    )
     powershell = (root / "scripts" / "install_claude.ps1").read_text(encoding="utf-8")
     assert powershell.index("Resolve-Path -LiteralPath $Target") < powershell.index(
         "Set-Location $root"

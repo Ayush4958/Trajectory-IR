@@ -59,12 +59,24 @@ test -x "$ROOT/go/trajir.exe" || chmod +x "$ROOT/go/trajir.exe"
 test -f "$ROOT/go/trajir-mcp.exe"
 test -f "$ROOT/go/trajir-console.exe"
 
-if [[ ${#EXTRA[@]} -gt 0 ]]; then
-  python "$ROOT/scripts/write_claude_local_config.py" "${EXTRA[@]}"
+# TRAJIR_PYTHON, then the repo venv, then python3, then python.
+# That interpreter is written into the hook command.
+if [ -n "${TRAJIR_PYTHON:-}" ]; then
+  PY="$TRAJIR_PYTHON"
+elif [ -x "$ROOT/.venv/bin/python" ]; then
+  PY="$ROOT/.venv/bin/python"
+elif command -v python3 >/dev/null 2>&1; then
+  PY="python3"
 else
-  python "$ROOT/scripts/write_claude_local_config.py"
+  PY="python"
 fi
-python "$ROOT/scripts/local_one_step_smoke.py"
+
+if [[ ${#EXTRA[@]} -gt 0 ]]; then
+  "$PY" "$ROOT/scripts/write_claude_local_config.py" "${EXTRA[@]}"
+else
+  "$PY" "$ROOT/scripts/write_claude_local_config.py"
+fi
+"$PY" "$ROOT/scripts/local_one_step_smoke.py"
 
 echo ""
 if [[ -n "$TARGET" ]]; then

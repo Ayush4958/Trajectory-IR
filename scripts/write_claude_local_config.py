@@ -47,12 +47,17 @@ def main(argv: list[str] | None = None) -> int:
     if args.skip_console:
         print("console start skipped")
         return 0
-    launch = start_console_if_free(_ROOT)
+    dest = Path(args.target).resolve() if args.target else _ROOT
+    data = dest / ".local-evidence" / "console-data"
+    launch = start_console_if_free(_ROOT, data_dir=data)
     if launch.status == "already":
         print("console already on 127.0.0.1:8787; left it alone")
-    else:
-        print("console started on 127.0.0.1:8787")
-    return 0
+        return 0
+    if launch.status == "started":
+        print(f"console started on 127.0.0.1:8787 data={data}")
+        return 0
+    print("console did not stay up on 127.0.0.1:8787", file=sys.stderr)
+    return 1
 
 
 if __name__ == "__main__":

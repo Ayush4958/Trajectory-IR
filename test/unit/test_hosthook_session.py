@@ -83,6 +83,44 @@ def test_seal_then_record_keeps_decision_first(tmp_path: Path) -> None:
     assert calls["n"] == 0
 
 
+def test_same_owner_bash_pending_is_a_replay(tmp_path: Path) -> None:
+    first = seal_before_tool(
+        tmp_path,
+        "demo",
+        "hook-bash-again",
+        "Bash",
+        {"command": "echo hi"},
+        "use-again",
+        owner="project",
+    )
+    assert first["effect_class"] == "NON_IDEMPOTENT_WRITE"
+    again = seal_before_tool(
+        tmp_path,
+        "demo",
+        "hook-bash-again",
+        "Bash",
+        {"command": "echo hi"},
+        "use-again",
+        owner="project",
+    )
+    assert again["replay"] is True
+    other = seal_before_tool(
+        tmp_path,
+        "demo",
+        "hook-bash-again",
+        "Bash",
+        {"command": "echo hi"},
+        "use-again",
+        owner="user",
+    )
+    assert other["duplicate"] is True
+    assert "replay" not in other
+    saved = json.loads((tmp_path / "hook_state.json").read_text(encoding="utf-8"))
+    assert saved["pending"]["use-again"]["owner"] == "project"
+    assert "replay" not in saved["pending"]["use-again"]
+    assert saved["pending"]["use-again"]["owner"] == "project"
+
+
 def test_bash_fails_closed(tmp_path: Path) -> None:
     sealed = seal_before_tool(
         tmp_path,

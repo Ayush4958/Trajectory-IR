@@ -28,7 +28,10 @@ def _identity_file() -> Path | None:
         return None
     path = Path(env_file)
     if not path.is_file():
-        raise FileNotFoundError(f"TRAJIR_IDENTITY_FILE not found: {path}")
+        raise FileNotFoundError(
+            f"TRAJIR_IDENTITY_FILE not found: {path}. "
+            "Re-run scripts/install_claude.ps1 or scripts/install_claude.sh."
+        )
     return path
 
 
