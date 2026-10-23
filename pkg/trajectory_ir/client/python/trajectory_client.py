@@ -10,7 +10,6 @@ from trajectory_ir.console_emit import (
     note_projection,
     note_seal,
 )
-from trajectory_ir.drivers.durable_backend.dbos.adapter import init_backend
 from trajectory_ir.effects import assert_open_world_effect, requires_block_and_gate
 from trajectory_ir.resume.gate import make_gated_tool_call, make_plain_tool_call
 from trajectory_ir.resume.world import WorldDrift, decision_payload
@@ -95,7 +94,7 @@ def _init_durable_backend(db_path: str, durable: bool | None) -> None:
     # Imported here, not at module top: a top-level import is what forced
     # dbos into the core dependencies (#451).
     try:
-        from drivers.durable_backend.dbos.adapter import init_backend
+        from trajectory_ir.drivers.durable_backend.dbos.adapter import init_backend
     except ImportError:
         if durable:
             raise
