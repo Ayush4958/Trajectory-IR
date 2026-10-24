@@ -119,10 +119,10 @@ pwsh -File scripts\install_claude.ps1
 ```
 
 ```bash
-./scripts/install_claude.sh
+bash scripts/install_claude.sh
 ```
 
-PowerShell uses `TRAJIR_PYTHON`, then `.venv\Scripts\python.exe`, then `python`. The shell script uses `TRAJIR_PYTHON`, then `.venv/bin/python`, then `python3`, then `python`. That interpreter is what the hook command runs.
+PowerShell uses `TRAJIR_PYTHON`, then `.venv\Scripts\python.exe`, then `python`. The shell script uses `TRAJIR_PYTHON`, then `.venv/bin/python` (or `.venv/Scripts/python.exe`), then `python3`, then `python`. That interpreter is what the hook command runs.
 
 Verify a pack you exported. There is no `pack.tir` until something writes one:
 
@@ -134,9 +134,9 @@ What that command already does:
 
 1. Builds `go/trajir.exe` and `go/trajir-mcp.exe`. The names keep the `.exe` suffix on every OS, because `go/trajir` is the package directory.
 2. Merges `PreToolUse`, `PostToolUse`, and `PostToolUseFailure` into `.claude/settings.local.json`, and merges the MCP server into `.mcp.json`. Existing JSON objects are kept. Invalid JSON, including a comment or a trailing comma, is left as it is and the command exits 1, so the smoke check does not run. Claude Code asks you to approve the project MCP server before that server starts.
-3. Seals the decision in PreToolUse. A seal error on this call exits 2 and Claude skips that tool. The next call is a new process, so a missing tool id or a lock timeout does not block later tools. If the python in the hook command cannot import this repo, every call exits 2 until you run the installer again. When the seal succeeds, the tool runs and `PostToolUse` records the result. PostToolUse is best-effort: errors are swallowed and the hook exits 0. On this Claude path the tool-call row is stored only after the tool runs. PostToolUseFailure records a failed tool and clears the pending row. If Claude denies the tool after the seal, neither post hook runs. The pending row stays in `.local-evidence/claude-agent/hook_state.json` and the decision stays in the log. The next tool is a new step. Leave that row. There is no cleanup command.
+3. Seals the decision in PreToolUse. A seal error on this call exits 2 and Claude skips that tool. The next call is a new process, so a missing tool id or a lock timeout does not block later tools. If the python in the hook command cannot import this repo, the hook crashes with exit 1, Claude treats that as non-blocking, and the tool runs unsealed. Fix the interpreter (`TRAJIR_PYTHON` or `.venv`), delete the `trajectory-ir` hook entries from `.claude/settings.local.json`, then run the installer again. When the seal succeeds, the tool runs and `PostToolUse` records the result. PostToolUse is best-effort: errors are swallowed and the hook exits 0. On this Claude path the tool-call row is stored only after the tool runs. PostToolUseFailure records a failed tool and clears the pending row. If Claude denies the tool after the seal, neither post hook runs. The pending row stays in `.local-evidence/claude-agent/hook_state.json` and the decision stays in the log. The next tool is a new step. Leave that row. There is no cleanup command.
 4. Writes the log directly. This path does not start DBOS.
-5. Smoke-verifies one local pack before it prints `INSTALL OK`.
+5. Seals and records one local pack through the library, then prints `INSTALL OK`. This does not run the hook scripts, so it does not prove the hook command works.
 
 The user profile at `~/.claude` is not changed. The console on `127.0.0.1:8787` is not started by this script. Hooks stay inside this worktree.
 
@@ -166,7 +166,7 @@ agent = Agent(
 
 MCP (`trajectory_status`, `trajectory_export_tir`, `trajectory_import_tir`, `trajectory_verify_signature`) reports status and checks packs. It does not seal the host's own tools. An unknown tool, and any tool named Bash, stays `NON_IDEMPOTENT_WRITE`.
 
-Token numbers on the console are `ceil(chars/4)` estimates, not a provider invoice. The adopter list is empty. This is not exactly-once, not a process sandbox, and not Sigstore. OpenTelemetry labels are copied only after the in-process seal.
+Token numbers on the console are `ceil(chars/4)` estimates, not a provider invoice. The adopter list is empty. This is not exactly-once, not a process sandbox, and not Sigstore.
 
 The short page is [website/docs/one-step.md](website/docs/one-step.md). The Article 12 field map names pack fields. It is not a compliance claim: [docs/ARTICLE_12_FIELD_MAP.md](docs/ARTICLE_12_FIELD_MAP.md).
 

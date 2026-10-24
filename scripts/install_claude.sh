@@ -17,12 +17,14 @@ test -x "$ROOT/go/trajir.exe" || chmod +x "$ROOT/go/trajir.exe"
 test -f "$ROOT/go/trajir-mcp.exe"
 
 # TRAJIR_PYTHON, then the repo venv, then python3, then python.
-# The hook command is this interpreter. A bare python that cannot
-# import the repo makes every later tool call exit 2.
+# The hook command is this interpreter. If it cannot import the repo, the
+# hook exits 1, the host does not block, and the tool runs unsealed.
 if [ -n "${TRAJIR_PYTHON:-}" ]; then
   PY="$TRAJIR_PYTHON"
 elif [ -x "$ROOT/.venv/bin/python" ]; then
   PY="$ROOT/.venv/bin/python"
+elif [ -x "$ROOT/.venv/Scripts/python.exe" ]; then
+  PY="$ROOT/.venv/Scripts/python.exe"
 elif command -v python3 >/dev/null 2>&1; then
   PY="python3"
 else

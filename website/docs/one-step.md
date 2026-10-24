@@ -7,7 +7,7 @@ pwsh -File scripts\install_claude.ps1
 ```
 
 ```bash
-./scripts/install_claude.sh
+bash scripts/install_claude.sh
 ```
 
 Verify a pack you exported. Install does not create `pack.tir`.
@@ -16,7 +16,7 @@ Verify a pack you exported. Install does not create `pack.tir`.
 ./go/trajir.exe verify path/to/pack.tir
 ```
 
-The shell script uses `TRAJIR_PYTHON`, then `.venv/bin/python`, then `python3`, then `python`. PowerShell uses `TRAJIR_PYTHON`, then the repo `.venv`, then `python`.
+The shell script uses `TRAJIR_PYTHON`, then `.venv/bin/python` (or `.venv/Scripts/python.exe`), then `python3`, then `python`. PowerShell uses `TRAJIR_PYTHON`, then the repo `.venv`, then `python`.
 
 The PreToolUse hook seals the decision. A seal error on this call exits 2 and the host skips that tool. The next call is a new process. PostToolUse records the result after the tool has run. That hook is best-effort: a diary error is swallowed and the process still exits 0. PostToolUseFailure records a failed tool and clears its pending row. If the host denies the tool after the seal, neither post hook runs, the pending row stays, and the next tool is a new step. The hook writes the log directly and does not start DBOS. On this path the tool-call row is stored after the host tool, so it records the call. The LangGraph wrap is the path that gates the tool body. `trajir verify` checks the pack offline.
 

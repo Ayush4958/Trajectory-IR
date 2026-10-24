@@ -90,13 +90,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 - `scripts/install_claude.sh` uses `TRAJIR_PYTHON`, then `.venv/bin/python`,
-  then `python3`, then `python`. A bare `python` was written into the hook
-  command, so a machine with only `python3` exited 2 on every tool call.
+  then `python3`, then `python`. The installer used to run under a bare
+  `python`, which could resolve to the wrong interpreter. The hook command
+  stores that interpreter's absolute path.
 - Unsigned `.tir` loads reject duplicate zip members (#469). Postgres
   `Append` returns the slot-lookup error (#465). An S3 outage is not
   reported as a missing object (#467). Go memo keys are `tenant|workflow`
   (#471). Id length counts characters (#466). `node_id` checks every
   preimage field (#468).
+- Gated tool replay: re-entering a `NON_IDEMPOTENT_WRITE` call whose
+  `TOOL_RESULT` is already recorded now returns that result. It used to append
+  `ABORT` next to the completed `TOOL_RESULT` and raise `BlockedNeedsGate`.
+  A claimed `TOOL_CALL` with no `TOOL_RESULT` still blocks. Python and Go.
 - Go `PayloadHash` refuses Go integer values and JSON integer literals
   outside `-(2^53-1) .. 2^53-1`, matching Python rfc8785. Floats still
   hash. SQLite, Postgres, and `.tir` load keep number text with
@@ -125,6 +130,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `WorkDir` and may live outside it. The console's `/v1/local/reveal` and
   `/v1/local/open-shell` require `Content-Type: application/json` on every request,
   empty body included, and answer 415 otherwise.
+- `AGENT_SPAWN` is now block-and-gated on resume like `NON_IDEMPOTENT_WRITE`
+  (`requires_block_and_gate` / `RequiresBlockAndGate`), matching spec §7.1.
+  `SENSITIVE` is documented as a layered flag with no resume gate of its own;
+  redaction stays key- and value-based (#321).
 
 ## [0.2.2] - 2026-09-07
 
