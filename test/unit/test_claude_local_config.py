@@ -205,6 +205,41 @@ def test_user_hook_that_only_names_the_script_is_kept(tmp_path: Path) -> None:
     assert sum("launch_hook.py" in command for command in again) == 3
 
 
+def test_forward_slash_launcher_is_replaced(tmp_path: Path) -> None:
+    module = _load()
+    settings_path = tmp_path / ".claude" / "settings.local.json"
+    settings_path.parent.mkdir(parents=True)
+    launcher = tmp_path / "integrations" / "attach" / "launch_hook.py"
+    forward = str(launcher).replace("\\", "/")
+    user_cmd = "echo keep-me"
+    settings_path.write_text(
+        json.dumps(
+            {
+                "hooks": {
+                    "PreToolUse": [
+                        {
+                            "matcher": "*",
+                            "hooks": [
+                                {"type": "command", "command": user_cmd},
+                                {
+                                    "type": "command",
+                                    "command": f'python "{forward}" id script pre project',
+                                },
+                            ],
+                        }
+                    ]
+                }
+            }
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    assert module.write_local_config(tmp_path, sys.executable, tmp_path / "trajir-mcp") == 0
+    commands = _commands(json.loads(settings_path.read_text(encoding="utf-8")))
+    assert commands.count(user_cmd) == 1
+    assert sum("launch_hook.py" in command for command in commands) == 3
+
+
 def test_gitignore_keeps_an_existing_local_evidence_line(tmp_path: Path) -> None:
     module = _load()
     target = tmp_path / "project"
@@ -251,6 +286,8 @@ def test_install_scripts_resolve_target_before_changing_directory() -> None:
     assert shell.index('TARGET="$(cd "$2" && pwd)"') < shell.index('cd "$ROOT"')
     assert "TRAJIR_PYTHON" in shell
     assert "command -v python3" in shell
+    assert ".venv/Scripts/python.exe" in shell
+    assert shell.index(".venv/Scripts/python.exe") < shell.index("command -v python3")
     assert shell.index("TRAJIR_PYTHON") < shell.index(
         '"$PY" "$ROOT/scripts/write_claude_local_config.py"'
     )

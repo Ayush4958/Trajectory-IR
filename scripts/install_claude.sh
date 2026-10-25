@@ -65,6 +65,9 @@ if [ -n "${TRAJIR_PYTHON:-}" ]; then
   PY="$TRAJIR_PYTHON"
 elif [ -x "$ROOT/.venv/bin/python" ]; then
   PY="$ROOT/.venv/bin/python"
+elif [ -x "$ROOT/.venv/Scripts/python.exe" ] || [ -f "$ROOT/.venv/Scripts/python.exe" ]; then
+  # Git Bash often does not see a Windows python.exe as executable.
+  PY="$ROOT/.venv/Scripts/python.exe"
 elif command -v python3 >/dev/null 2>&1; then
   PY="python3"
 else

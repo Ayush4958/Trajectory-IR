@@ -37,6 +37,34 @@ def test_missing_script_exits_2_on_pre_and_0_on_post(tmp_path: Path) -> None:
     assert launch_main(["only-one"]) == 2
 
 
+def test_script_outside_the_install_is_not_executed(tmp_path: Path) -> None:
+    ident = tmp_path / "id.json"
+    ident.write_text("{}\n", encoding="utf-8")
+    marker = tmp_path / "ran.txt"
+    rogue = tmp_path / "rogue.py"
+    rogue.write_text(
+        f"from pathlib import Path\nPath({str(marker)!r}).write_text('ran', encoding='utf-8')\n",
+        encoding="utf-8",
+    )
+    assert launch_main([str(ident), str(rogue), "pre"]) == 2
+    assert launch_main([str(ident), str(rogue), "post"]) == 0
+    assert not marker.exists()
+
+
+def test_import_error_on_pre_exits_2(tmp_path: Path, monkeypatch) -> None:
+    ident = tmp_path / "id.json"
+    ident.write_text("{}\n", encoding="utf-8")
+    broken = tmp_path / "broken.py"
+    broken.write_text("import this_module_does_not_exist\n", encoding="utf-8")
+    monkeypatch.setattr(
+        "integrations.attach.launch_hook._allowed_script",
+        lambda _script: broken.resolve(),
+    )
+    assert launch_main([str(ident), str(broken), "pre"]) == 2
+    assert launch_main([str(ident), str(broken), "post"]) == 0
+    assert not (tmp_path / "work").exists()
+
+
 def test_subprocess_other_owner_bash_exits_0(tmp_path: Path) -> None:
     work = tmp_path / "work"
     ident = tmp_path / "id.json"

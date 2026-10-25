@@ -137,6 +137,24 @@ def test_confirm_reports_down_when_the_process_exits(tmp_path: Path) -> None:
     assert result.status == "down"
 
 
+def test_missing_go_names_the_console_binary(tmp_path: Path, monkeypatch) -> None:
+    monkeypatch.setattr(
+        "integrations.attach.console_launch.shutil.which",
+        lambda _name: None,
+    )
+
+    def popen(*_args: object, **_kwargs: object) -> object:
+        raise AssertionError("spawned without a binary")
+
+    with pytest.raises(FileNotFoundError, match=r"trajir-console\.exe"):
+        start_console_if_free(
+            tmp_path,
+            probe=lambda: False,
+            popen=popen,
+            confirm=False,
+        )
+
+
 def test_detach_sets_a_new_session(tmp_path: Path) -> None:
     exe = tmp_path / "go" / "trajir-console.exe"
     exe.parent.mkdir(parents=True)

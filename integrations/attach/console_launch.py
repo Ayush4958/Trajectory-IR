@@ -6,6 +6,7 @@ Any other address is refused. A listener that is already up is left alone.
 from __future__ import annotations
 
 import os
+import shutil
 import socket
 import subprocess
 import time
@@ -33,10 +34,22 @@ def console_is_up(addr: str = CONSOLE_ADDR, timeout: float = 0.3) -> bool:
 
 
 def console_binary(root: Path) -> Path:
-    """Return go/trajir-console.exe, building it when the file is missing."""
+    """Return go/trajir-console.exe, building it when the file is missing.
+
+    The ``.exe`` name is the same on every OS so the binary does not land
+    inside the ``go/trajir`` package directory. A checkout without Go, and
+    without that file, fails here with a named path instead of a missing
+    ``go`` command.
+    """
     exe = Path(root) / "go" / "trajir-console.exe"
     if exe.is_file():
         return exe
+    if shutil.which("go") is None:
+        raise FileNotFoundError(
+            "go/trajir-console.exe is missing and the go command was not found. "
+            "This step builds that binary from the git checkout. "
+            "Install Go, or place the binary at go/trajir-console.exe."
+        )
     exe.parent.mkdir(parents=True, exist_ok=True)
     subprocess.check_call(
         ["go", "build", "-o", str(exe), "./cmd/trajir-console"],

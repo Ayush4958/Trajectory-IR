@@ -36,6 +36,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   when those lines are missing. An existing `.local-evidence` line
   counts. MCP command paths in the project config are absolute on that
   machine.
+- The Claude hook launcher only runs `integrations/claude/pre_tool_use.py`,
+  `post_tool_use.py`, and `post_tool_use_failure.py` from this install.
+  Another path exits 2 on pre, exits 0 on post, and is not executed.
+  The install root on `sys.path` is this checkout. `scripts/install_claude.sh`
+  uses `.venv/Scripts/python.exe` when that file is present, including when
+  Git Bash does not mark it executable. A hook command that names the
+  launcher with the other slash form is replaced on the next run. If
+  `go/trajir-console.exe` is missing and `go` is not installed, the console
+  step names that path.
 - The installer starts `trajir-console` on `127.0.0.1:8787` when that
   port is free and waits until the process accepts a connection. The
   data directory is `<target>/.local-evidence/console-data`. It does not

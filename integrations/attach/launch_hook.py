@@ -1,7 +1,8 @@
 """Launch a Claude hook with a project identity file.
 
 argv: identity_path script_path kind [owner]
-kind is "pre" or "post". A launcher error on pre exits 2. On post it exits 0
+kind is "pre" or "post". The script must be one of the three Claude hook
+files in this install. A launcher error on pre exits 2. On post it exits 0
 so a broken launcher does not ask the host to run the tool again. Omitting
 the owner is the same as an empty owner.
 """
@@ -12,6 +13,14 @@ import os
 import runpy
 import sys
 from pathlib import Path
+
+# The launcher only runs these three files from this install. A path from
+# argv is not a hook, and it must not put some other directory on sys.path.
+_ALLOWED_HOOKS = (
+    Path("integrations") / "claude" / "pre_tool_use.py",
+    Path("integrations") / "claude" / "post_tool_use.py",
+    Path("integrations") / "claude" / "post_tool_use_failure.py",
+)
 
 
 def _fail_code(kind: str) -> int:
@@ -27,9 +36,25 @@ def _exit_code(exc: SystemExit, kind: str) -> int:
     return _fail_code(kind)
 
 
-def _prepare(identity: str, script: str) -> Path:
+def _repo_root() -> Path:
+    return Path(__file__).resolve().parents[2]
+
+
+def _allowed_script(script: str) -> Path:
+    root = _repo_root()
     script_path = Path(script).resolve()
-    repo = script_path.parents[2]
+    allowed = {(root / relative).resolve() for relative in _ALLOWED_HOOKS}
+    if script_path not in allowed or not script_path.is_file():
+        raise ValueError(
+            "hook script must be pre_tool_use.py, post_tool_use.py, "
+            "or post_tool_use_failure.py in this install"
+        )
+    return script_path
+
+
+def _prepare(identity: str, script: str) -> Path:
+    script_path = _allowed_script(script)
+    repo = _repo_root()
     os.environ["TRAJIR_IDENTITY_FILE"] = str(Path(identity).resolve())
     for entry in (str(repo), str(repo / "pkg")):
         if entry not in sys.path:

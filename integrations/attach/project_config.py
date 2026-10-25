@@ -49,6 +49,14 @@ def _write_json(path: Path, payload: dict) -> None:
     path.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
 
 
+def _launcher_in_command(text: str, launcher: str) -> bool:
+    """True when the command names this launcher, either slash form."""
+    if not text or not launcher:
+        return False
+    forms = {launcher, launcher.replace("\\", "/"), launcher.replace("/", "\\")}
+    return any(form in text for form in forms if form)
+
+
 def _with_hook(settings: dict, event: str, command: str, match: str) -> dict:
     """Refresh our launcher command. Leave a user hook that does not use it."""
     hooks = settings.get("hooks")
@@ -68,7 +76,7 @@ def _with_hook(settings: dict, event: str, command: str, match: str) -> dict:
         new_hooks: list[object] = []
         for hook in hook_list:
             text = str(hook.get("command") or "") if isinstance(hook, dict) else ""
-            if isinstance(hook, dict) and match and match in text:
+            if isinstance(hook, dict) and _launcher_in_command(text, match):
                 new_hooks.append({**hook, "command": command})
                 replaced = True
             else:
