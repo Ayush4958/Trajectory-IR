@@ -110,35 +110,35 @@ More: **[QUICKSTART.md](QUICKSTART.md)** · kill-mid-deploy demo: [`examples/kil
 
 ---
 
-## One step in front of Claude Code
+## Attach it to a project
 
-One command in this checkout builds the verify binary, points Claude Code at project-local hooks, and checks one pack. It does not download Claude. It sets Trajectory IR up in front of the Claude Code session that already uses this worktree.
+One command in this checkout builds `trajir.exe`, `trajir-mcp.exe`, and `trajir-console.exe`. It does not download Claude. It writes project-local hooks and smoke-checks one pack. The user profile is not edited. With no target, that project is this checkout. `--target` is another directory.
 
 ```powershell
 pwsh -File scripts\install_claude.ps1
+pwsh -File scripts\install_claude.ps1 -Target C:\path\to\other\repo
 ```
 
 ```bash
-bash scripts/install_claude.sh
+./scripts/install_claude.sh
+./scripts/install_claude.sh --target /path/to/other/repo
 ```
 
-PowerShell uses `TRAJIR_PYTHON`, then `.venv\Scripts\python.exe`, then `python`. The shell script uses `TRAJIR_PYTHON`, then `.venv/bin/python` (or `.venv/Scripts/python.exe`), then `python3`, then `python`. That interpreter is what the hook command runs.
+PowerShell uses `TRAJIR_PYTHON`, then `.venv\Scripts\python.exe`, then `python`. The shell script uses `TRAJIR_PYTHON`, then `.venv/bin/python`, then `.venv/Scripts/python.exe` when that file exists, then `python3`, then `python`. That interpreter is what the hook command runs.
 
-Verify a pack you exported. There is no `pack.tir` until something writes one:
+`--target` writes the config into that directory. The hook scripts stay in this install. The same step writes Cursor, VS Code, Gemini CLI, and Codex project MCP config. Those entries do not seal the host's own tools. LangGraph and ADK snippets land in `.trajir/` and import their libraries only when called.
+
+Invalid JSON, including a comment or a trailing comma, is left as it is and the command exits 1, so the smoke check does not run. Claude Code asks you to approve the project MCP server before that server starts. The smoke check seals one local pack through the library and prints `INSTALL OK`. It does not run the hook scripts, so it does not prove the hook command. There is no `pack.tir` until something writes one:
 
 ```bash
 ./go/trajir.exe verify path/to/pack.tir
 ```
 
-What that command already does:
+The first PreToolUse exits 0 after the seal so the host can run the tool. The hook command carries the owner word `project`. The same owner asking again while that call is still pending exits 2 for `NON_IDEMPOTENT_WRITE` and for a row with no effect class. That is a crash before PostToolUse. A different owner on that pending call exits 0, so a second registration can watch the same attempt. A second registration of this hook must use a different owner word. The same word looks like a retry and blocks the first run. After PostToolUse records the result, a later PreToolUse for that `NON_IDEMPOTENT_WRITE` id exits 2. A recorded row with no effect class exits 2 as well. The hook does not call the tool and does not start DBOS. PostToolUse is best-effort: if the diary write fails, it still exits 0, and the tool-call row is stored only after the tool has run. PostToolUseFailure records a failed tool and clears the pending row. If Claude denies the tool after the seal, neither post hook runs. The pending row stays in the target `.local-evidence` and the decision stays in the log. The next tool is a new step. Leave that row. There is no cleanup command. A missing `TRAJIR_IDENTITY_FILE` exits 2 and names `scripts/install_claude.ps1` or `scripts/install_claude.sh`. When that variable is unset, the work directory is this install's `.local-evidence/claude-agent`. The launcher only runs `pre_tool_use.py`, `post_tool_use.py`, and `post_tool_use_failure.py` from this install. Any other script exits 2 on PreToolUse and is not executed. If Python itself never starts, the host can still run the tool. Once the launcher process is up, an import error on PreToolUse exits 2.
 
-1. Builds `go/trajir.exe` and `go/trajir-mcp.exe`. The names keep the `.exe` suffix on every OS, because `go/trajir` is the package directory.
-2. Merges `PreToolUse`, `PostToolUse`, and `PostToolUseFailure` into `.claude/settings.local.json`, and merges the MCP server into `.mcp.json`. Existing JSON objects are kept. Invalid JSON, including a comment or a trailing comma, is left as it is and the command exits 1, so the smoke check does not run. Claude Code asks you to approve the project MCP server before that server starts.
-3. Seals the decision in PreToolUse. A seal error on this call exits 2 and Claude skips that tool. The next call is a new process, so a missing tool id or a lock timeout does not block later tools. If the python in the hook command cannot import this repo, the hook crashes with exit 1, Claude treats that as non-blocking, and the tool runs unsealed. Fix the interpreter (`TRAJIR_PYTHON` or `.venv`), delete the `trajectory-ir` hook entries from `.claude/settings.local.json`, then run the installer again. When the seal succeeds, the tool runs and `PostToolUse` records the result. PostToolUse is best-effort: errors are swallowed and the hook exits 0. On this Claude path the tool-call row is stored only after the tool runs. PostToolUseFailure records a failed tool and clears the pending row. If Claude denies the tool after the seal, neither post hook runs. The pending row stays in `.local-evidence/claude-agent/hook_state.json` and the decision stays in the log. The next tool is a new step. Leave that row. There is no cleanup command.
-4. Writes the log directly. This path does not start DBOS.
-5. Seals and records one local pack through the library, then prints `INSTALL OK`. This does not run the hook scripts, so it does not prove the hook command works.
+The installer adds `.local-evidence/`, `.claude/settings.local.json`, `.mcp.json`, `.cursor/mcp.json`, `.vscode/mcp.json`, `.gemini/settings.json`, `.codex/config.toml`, and `.trajir/*.py` to the target `.gitignore` when those lines are missing.
 
-The user profile at `~/.claude` is not changed. The console on `127.0.0.1:8787` is not started by this script. Hooks stay inside this worktree.
+If `127.0.0.1:8787` is free, the installer starts `trajir-console` and waits until it accepts a connection. The console data directory is `<target>/.local-evidence/console-data`. If something is already listening, it leaves that process alone. If the new process dies, the installer says so and exits 1. `--skip-console` skips the start. There is no second console. The binary names keep the `.exe` suffix on every OS, because `go/trajir` is the package directory. If `go/trajir-console.exe` is missing and `go` is not installed, the installer names the path and stops.
 
 Two in-process wraps are already on main, for hosts that call tools in the same process.
 
@@ -166,9 +166,9 @@ agent = Agent(
 
 MCP (`trajectory_status`, `trajectory_export_tir`, `trajectory_import_tir`, `trajectory_verify_signature`) reports status and checks packs. It does not seal the host's own tools. An unknown tool, and any tool named Bash, stays `NON_IDEMPOTENT_WRITE`.
 
-Token numbers on the console are `ceil(chars/4)` estimates, not a provider invoice. The adopter list is empty. This is not exactly-once, not a process sandbox, and not Sigstore.
+Token numbers on the console are `ceil(chars/4)` estimates. Adopters stay empty. This is not exactly-once, not a process sandbox, and not Sigstore.
 
-The short page is [website/docs/one-step.md](website/docs/one-step.md). The Article 12 field map names pack fields. It is not a compliance claim: [docs/ARTICLE_12_FIELD_MAP.md](docs/ARTICLE_12_FIELD_MAP.md).
+The install page is [website/docs/one-step.md](website/docs/one-step.md). GitHub Actions builds it from `.github/workflows/docs-site.yml` after that file is on main. The Article 12 field map names pack fields. It is not a compliance claim: [docs/ARTICLE_12_FIELD_MAP.md](docs/ARTICLE_12_FIELD_MAP.md).
 
 ---
 
@@ -177,7 +177,7 @@ The short page is [website/docs/one-step.md](website/docs/one-step.md). The Arti
 | Audience | Start here |
 |---|---|
 | **Students / newcomers** | This README → [go/QUICKSTART.md](go/QUICKSTART.md) → try sandbox + kill-mid-deploy demos |
-| **Claude Code, this checkout** | [One step in front of Claude Code](#one-step-in-front-of-claude-code) |
+| **Claude Code** | [Attach it to a project](#attach-it-to-a-project) |
 | **Agent / platform engineers** | [docs/SCOPE_AND_NON_GOALS.md](docs/SCOPE_AND_NON_GOALS.md) → [docs/INTEGRATIONS.md](docs/INTEGRATIONS.md) → wire seals into your host loop |
 | **Security / compliance** | Seals + `.tir` (hash-verifiable export); report issues via [SECURITY.md](SECURITY.md). Sandbox is a demo gate, not a security boundary. |
 | **Contributors** | [CONTRIBUTING.md](CONTRIBUTING.md) (DCO required) → Phase 1B/1C: **Go first** |
